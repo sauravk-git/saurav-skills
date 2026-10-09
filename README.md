@@ -12,6 +12,7 @@ for Qualcomm platform and AudioReach development.
 | Skill | Description |
 |---|---|
 | [debian-packager](skills/debian-packager/SKILL.md) | End-to-end Debian packaging skeleton generator for QCOM/AudioReach components — supports Yocto recipes, remote URLs, and local source trees |
+| [rpm-packager](skills/rpm-packager/SKILL.md) | End-to-end RPM packaging skeleton generator for CentOS Stream 10 (aarch64) — generates spec files, dist-git sources, and GitHub Actions CI/release workflows modelled on qualcomm-linux/pkg-rpm-audioreach-pal |
 
 ---
 
@@ -246,6 +247,87 @@ skills/debian-packager/
 ```
 
 ---
+
+---
+
+## rpm-packager Skill
+
+### What it does
+
+Generates a complete `pkg-rpm-<name>/` repository skeleton for CentOS Stream 10
+(aarch64), modelled exactly on
+[qualcomm-linux/pkg-rpm-audioreach-pal](https://github.com/qualcomm-linux/pkg-rpm-audioreach-pal).
+
+| Input | Example |
+|---|---|
+| Yocto `.bb` recipe | `audioreach-pal_1.0.2.bb` |
+| Remote git or tarball URL | `https://github.com/AudioReach/audioreach-pal` |
+| Local source tree or tarball | `./audioreach-pal/` |
+
+### Usage
+
+```bash
+# AudioReach PAL — version auto-detected via GitHub API
+python3 skills/rpm-packager/scripts/rpm_packager.py \
+    --url https://github.com/AudioReach/audioreach-pal \
+    --output /tmp/pkg-rpm-audioreach-pal
+
+# AudioReach PipeWire plugin
+python3 skills/rpm-packager/scripts/rpm_packager.py \
+    --url https://github.com/AudioReach/audioreach-pipewire-plugin \
+    --output /tmp/pkg-rpm-audioreach-pipewire-plugin
+
+# From a Yocto recipe
+python3 skills/rpm-packager/scripts/rpm_packager.py \
+    --recipe meta-qcom/recipes-audioreach/audioreach-pal/audioreach-pal_1.0.2.bb \
+    --output /tmp/pkg-rpm-audioreach-pal
+
+# Dry-run preview
+python3 skills/rpm-packager/scripts/rpm_packager.py \
+    --url https://github.com/AudioReach/audioreach-pal \
+    --dry-run --verbose
+```
+
+### Generated output
+
+```
+pkg-rpm-<name>/
+├── <name>.spec                    spec file (Version, Release, BuildRequires, %files)
+├── sources                        SHA-512 dist-git checksum file
+├── README.md                      package description
+├── docs/workflows.md              CI workflow documentation
+└── .github/
+    ├── CODEOWNERS
+    ├── dependabot.yaml
+    ├── ISSUE_TEMPLATE/
+    ├── PULL_REQUEST_TEMPLATE/
+    └── workflows/
+        ├── build-on-pr.yml        PR build via qcom-rpm-utils
+        └── pkg-release.yml        manual release to Artifactory (staging/prod)
+```
+
+### After generating
+
+```bash
+# Compute real SHA-512 for sources
+sha512sum --tag <name>-<version>.tar.gz > sources
+
+# Push to GitHub on c10s branch
+git checkout -b c10s
+git add <name>.spec sources
+git push origin c10s
+```
+
+### Spec structure
+
+Follows the exact real-world reference from `qualcomm-linux/pkg-rpm-audioreach-pal`:
+- `%global debug_package %{nil}` and `%global _lto_cflags %{nil}` globals
+- `ExclusiveArch: aarch64`
+- `Source0: %{url}/archive/refs/tags/v%{version}.tar.gz#/%{name}-%{version}.tar.gz`
+- Split `%package devel` with headers + pkgconfig
+- `find %{buildroot} -name '*.la' -delete` in `%install`
+- `publish-target: staging | prod` choice in release workflow
+
 
 ## Requirements
 

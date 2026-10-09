@@ -1,0 +1,62 @@
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+# SPDX-License-Identifier: BSD-3-Clause
+%global debug_package %{nil}
+%global _lto_cflags %{nil}
+
+Name:           {{PKG_NAME}}
+Version:        {{VERSION}}
+Release:        {{RELEASE}}%{?dist}
+Summary:        {{SUMMARY}}
+ExclusiveArch:  aarch64
+
+License:        {{LICENSE_SPDX}}
+URL:            {{HOMEPAGE}}
+Source0:        %{url}/archive/refs/tags/v%{version}.tar.gz#/%{name}-%{version}.tar.gz
+
+BuildRequires:  autoconf
+BuildRequires:  automake
+BuildRequires:  libtool
+BuildRequires:  make
+BuildRequires:  gcc
+BuildRequires:  gcc-c++
+BuildRequires:  pkgconfig
+{{EXTRA_BUILD_REQUIRES}}
+
+%description
+{{DESCRIPTION}}
+
+%package        devel
+Summary:        Development files for %{name}
+Requires:       %{name}%{?_isa} = %{version}-%{release}
+
+%description    devel
+Headers and pkg-config files for building applications that use
+{{SUMMARY}}.
+
+%prep
+%autosetup -n %{name}-%{version}
+
+%build
+autoreconf -fi
+%configure \
+    --with-glib
+
+%make_build
+
+%install
+%make_install
+find %{buildroot} -name '*.la' -delete
+
+%files
+%license LICENSE
+%{_libdir}/lib{{PKG_NAME}}.so.*
+%config(noreplace) %{_sysconfdir}/*.xml
+
+%files devel
+%{_includedir}/{{PKG_NAME}}/
+%{_libdir}/lib{{PKG_NAME}}.so
+%{_libdir}/pkgconfig/*.pc
+
+%changelog
+* {{CHANGELOG_DATE}} {{MAINTAINER}} - {{VERSION}}-{{RELEASE}}
+- Initial RPM packaging of {{PKG_NAME}} version {{VERSION}}.
