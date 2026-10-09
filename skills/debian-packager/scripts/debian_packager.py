@@ -278,19 +278,33 @@ class PackageManifest:
 # ---------------------------------------------------------------------------
 # Yocto recipe parser
 # ---------------------------------------------------------------------------
-_BB_VAR = re.compile(r'^([A-Z_][A-Z0-9_:]*)\s*(?:\??=|:=|\.=|=\+|=\.)\s*"(.*)"', re.M)
+_BB_VAR = re.compile(r'^([A-Z_][A-Z0-9_:]*)\s*(?:\??=|:=|\.=|=\+|=\.)\s*"(.*?)"', re.M)
 _BB_INHERIT = re.compile(r'^inherit\s+(.+)', re.M)
 _BB_SRC_URI = re.compile(r'SRC_URI\s*(?:\??=|:=|\+=|\.=)\s*"([^"]*)"', re.M | re.S)
 _BB_SRC_URI_CONT = re.compile(r'SRC_URI\s*\+=\s*"([^"]*)"', re.M | re.S)
 
 
 def _bb_vars(text: str) -> dict:
-    """Extract all variable assignments from a .bb file into a flat dict."""
-    result = {}
-    for m in _BB_VAR.finditer(text):
-        result[m.group(1)] = m.group(2)
-    return result
+    """Extract all variable assignments from a .bb file into a flat dict.
 
+    Handles multi-line values written with backslash-continuation::
+
+        DEPENDS = " \\\
+            audioreach-pal \\\
+            glib-2.0 \\\
+        "
+
+    The backslash+newline+indent is collapsed to a single space before
+    the regex runs, so the closing quote ends up on the same logical line
+    as the opening one and _BB_VAR can match the full value.
+    """
+    # r'\\\n[ \t]*' matches: literal backslash + newline + optional indent
+    _CONT = re.compile(r'\\\n[ \t]*')
+    joined = _CONT.sub(' ', text)
+    result = {}
+    for m in _BB_VAR.finditer(joined):
+        result[m.group(1)] = m.group(2).strip()
+    return result
 
 def _bb_inherits(text: str) -> list:
     classes = []
