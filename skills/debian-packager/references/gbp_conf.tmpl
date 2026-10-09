@@ -1,0 +1,12 @@
+[DEFAULT]
+debian-branch = qcom/debian/trixie/latest
+upstream-branch = qcom/upstream/latest
+upstream-tag = upstream/%(version)s
+sign-tags = False
+pristine-tar = True
+
+[buildpackage]
+export-dir = ../build-area/
+
+[import-orig]
+merge-mode = replace

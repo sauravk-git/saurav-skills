@@ -1,0 +1,13 @@
+---
+package: {{PKG_NAME}}
+version: {{FULL_VERSION}}
+distribution: {{DISTRO}}
+architectures:
+  - {{ARCHITECTURE}}
+build:
+  type: binary
+  sign: false
+tests:
+  - autopkgtest
+upload:
+  queue: default

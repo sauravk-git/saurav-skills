@@ -1,0 +1,10 @@
+#!/bin/sh
+set -e
+case "$1" in
+    configure)
+        dkms add -m {{MODULE_NAME}} -v {{MODULE_VERSION}} --rpm_safe_upgrade || true
+        dkms build -m {{MODULE_NAME}} -v {{MODULE_VERSION}} || true
+        dkms install -m {{MODULE_NAME}} -v {{MODULE_VERSION}} --force || true
+        ;;
+esac
+#DEBHELPER#

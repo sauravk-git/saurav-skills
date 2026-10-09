@@ -1,0 +1,16 @@
+Source: {{SOURCE_NAME}}
+Section: libs
+Priority: optional
+Maintainer: {{MAINTAINER}}
+Build-Depends: debhelper-compat (= 13), {{BUILD_DEPENDS}}
+Standards-Version: 4.6.2
+Rules-Requires-Root: no
+Homepage: {{HOMEPAGE}}
+Vcs-Git: {{VCS_GIT}}
+Vcs-Browser: {{VCS_BROWSER}}
+
+Package: {{PKG_NAME}}
+Architecture: {{ARCHITECTURE}}
+Depends: ${shlibs:Depends}, ${misc:Depends}, {{DEPENDS}}
+Description: {{SUMMARY}}
+ {{LONG_DESCRIPTION}}
