@@ -124,6 +124,93 @@ git push -u origin c10s
 - **Release**: Actions → Release → Run workflow → choose `staging` or `prod`
   (requires `pkg-release-approval` environment gate).
 
+### Step 6 — Build the RPM locally
+
+Every generated skeleton includes a `build.sh` and `build-tools/Dockerfile`
+that work for **any package** produced by this skill.
+
+```bash
+cd /tmp/pkg-rpm-<name>
+bash build.sh
+```
+
+That single command:
+1. Downloads the upstream tarball (or accepts one as an argument)
+2. Computes the SHA-512 and updates `sources`
+3. Resolves the builder container image (see priority below)
+4. Runs `dnf builddep` + `rpmbuild -ba` inside the container
+5. Writes `.rpm` and `.src.rpm` to `./output/`
+
+#### Builder image resolution (automatic, in priority order)
+
+| Priority | Image | When used |
+|---|---|---|
+| 1 | `ghcr.io/qualcomm-linux/rpm-builder:centos10` (cached) | Already pulled locally |
+| 2 | `ghcr.io/qualcomm-linux/rpm-builder:centos10` (pull) | Qualcomm network / org access |
+| 3 | `local/rpm-builder:centos10` (cached) | Previously built locally |
+| 4 | Built from `build-tools/Dockerfile` | Fallback — CentOS Stream 10 from `quay.io` |
+
+The fallback image is a one-time build (~2-3 min). After that it is cached
+and reused for all subsequent builds.
+
+Override the image explicitly:
+```bash
+BUILDER_IMAGE="ghcr.io/myorg/rpm-builder:centos10" bash build.sh
+```
+
+#### Handling private/Qualcomm-specific BuildRequires
+
+Packages with Qualcomm-specific deps (`spf`, `kvh2xml`, `gsl`, `ar_osal`,
+`ats`, etc.) that are not in public CentOS repos need one of:
+
+**Option A — pre-built local dep RPMs:**
+```bash
+EXTRA_RPMS="spf-devel-1.0.rpm kvh2xml-devel-1.0.rpm gsl-devel-1.0.rpm" \
+    bash build.sh
+```
+
+**Option B — internal Artifactory / dnf repo:**
+```bash
+EXTRA_REPO="https://your-artifactory.qualcomm.com/artifactory/qcom-rpm-repo/" \
+    bash build.sh
+```
+
+Both options can be combined:
+```bash
+EXTRA_REPO="https://artifactory.example.com/rpm/" \
+EXTRA_RPMS="local-dep.rpm" \
+    bash build.sh
+```
+
+#### Supply a pre-downloaded tarball
+
+```bash
+bash build.sh /path/to/mypackage-1.2.0.tar.gz
+```
+
+#### After a successful build
+
+```bash
+# List generated packages
+ls -lh output/
+
+# Inspect RPM contents
+rpm -qlp output/<name>-<version>-1.el10.aarch64.rpm
+
+# Inspect RPM metadata
+rpm -qip output/<name>-<version>-1.el10.aarch64.rpm
+
+# Install on a CentOS Stream 10 aarch64 target
+sudo dnf install output/<name>-<version>-1.el10.aarch64.rpm
+```
+
+#### Requirements
+
+- Docker (any recent version)
+- Internet access (to fetch tarball and `dnf builddep` packages)
+- For the official builder image: access to `ghcr.io/qualcomm-linux` packages
+
+
 ---
 
 ## Spec File Structure

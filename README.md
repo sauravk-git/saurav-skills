@@ -306,16 +306,44 @@ pkg-rpm-<name>/
         └── pkg-release.yml        manual release to Artifactory (staging/prod)
 ```
 
-### After generating
+### Build the RPM locally
+
+Every generated skeleton includes `build.sh` and `build-tools/Dockerfile`.
 
 ```bash
-# Compute real SHA-512 for sources
-sha512sum --tag <name>-<version>.tar.gz > sources
+cd /tmp/pkg-rpm-<name>
+bash build.sh
+```
 
-# Push to GitHub on c10s branch
+The script auto-downloads the tarball, updates `sources`, resolves the
+builder image, and runs `rpmbuild -ba` inside a CentOS Stream 10 container.
+
+**With Qualcomm-specific deps (not in public repos):**
+```bash
+# Option A — pre-built dep RPMs
+EXTRA_RPMS="spf-devel.rpm kvh2xml-devel.rpm gsl-devel.rpm" bash build.sh
+
+# Option B — internal Artifactory repo
+EXTRA_REPO="https://your-artifactory.qualcomm.com/rpm/" bash build.sh
+```
+
+**Builder image priority** (automatic):
+1. `ghcr.io/qualcomm-linux/rpm-builder:centos10` (official, if accessible)
+2. `local/rpm-builder:centos10` built from `build-tools/Dockerfile` (fallback)
+
+**After a successful build:**
+```bash
+rpm -qlp output/<name>-<version>-1.el10.aarch64.rpm   # inspect
+sudo dnf install output/<name>-<version>-1.el10.aarch64.rpm  # install
+```
+
+### Push to GitHub for CI
+
+```bash
 git checkout -b c10s
 git add <name>.spec sources
 git push origin c10s
+# → build-on-pr.yml triggers automatically on the next PR
 ```
 
 ### Spec structure
