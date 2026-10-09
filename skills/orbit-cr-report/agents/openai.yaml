@@ -1,0 +1,4 @@
+interface:
+  display_name: "Orbit CR Report"
+  short_description: "Fetch Orbit query CRs by target"
+  default_prompt: "Run Orbit query 111043 and show CRs grouped by Found on Product sorted by age with Software Image status"
