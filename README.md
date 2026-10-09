@@ -13,6 +13,7 @@ for Qualcomm platform and AudioReach development.
 |---|---|
 | [debian-packager](skills/debian-packager/SKILL.md) | End-to-end Debian packaging skeleton generator for QCOM/AudioReach components — supports Yocto recipes, remote URLs, and local source trees |
 | [rpm-packager](skills/rpm-packager/SKILL.md) | End-to-end RPM packaging skeleton generator for CentOS Stream 10 (aarch64) — generates spec files, dist-git sources, and GitHub Actions CI/release workflows modelled on qualcomm-linux/pkg-rpm-audioreach-pal |
+| [orbit-cr-report](skills/orbit-cr-report/SKILL.md) | Fetch a saved Orbit query, parse all CRs, group by Found on Product (target), sort by age, and display Software Image Status (Analysis, Fixed, Build, etc.) with colour coding |
 
 ---
 
