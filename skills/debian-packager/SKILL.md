@@ -27,11 +27,11 @@ tree ready for `gbp buildpackage` or `dpkg-buildpackage`.
 
 | Mode | Example trigger |
 |---|---|
-| Yocto recipe file | `package fastrpc_1.0.6.bb` |
-| Remote git URL | `package https://github.com/qualcomm/fastrpc` |
-| Remote tarball URL | `package https://example.com/libfoo_1.2_arm64.tar.gz` |
-| Local source tree | `package ./my-driver/` |
-| Local tarball | `package ./libfoo_1.2_arm64.tar.gz` |
+| Yocto recipe file | `package audioreach-pal_1.0.2.bb` |
+| Remote git URL | `package https://github.com/AudioReach/audioreach-pal` |
+| Remote tarball URL | `package https://github.com/AudioReach/audioreach-audio-utils/archive/refs/tags/v1.0.0.tar.gz` |
+| Local source tree | `package ./audioreach-pal/` |
+| Local tarball | `package ./audioreach-audio-utils_1.0.0_arm64.tar.gz` |
 
 ---
 
@@ -62,7 +62,7 @@ Or from a URL:
 
 ```bash
 python3 scripts/debian_packager.py \
-    --url https://github.com/qualcomm/fastrpc \
+    --url https://github.com/AudioReach/audioreach-pal \
     --output /tmp/debian-out
 ```
 
@@ -70,7 +70,7 @@ Or from a local path:
 
 ```bash
 python3 scripts/debian_packager.py \
-    --path ./my-driver \
+    --path ./audioreach-pal \
     --output /tmp/debian-out \
     --dkms   # force DKMS mode if auto-detect misses it
 ```
@@ -117,10 +117,10 @@ bash build.sh
 bash build.sh
 
 # Option B — supply a local tarball
-bash build.sh /path/to/libfoo_1.2_arm64.tar.gz
+bash build.sh /path/to/audioreach-audio-utils_1.0.0_arm64.tar.gz
 
 # Option C — supply an already-unpacked directory
-bash build.sh /path/to/libfoo-1.2/
+bash build.sh /path/to/audioreach-audio-utils-1.0.0/
 ```
 
 **DKMS:**
@@ -220,40 +220,40 @@ uscan --no-download --verbose
 ## Example Invocations
 
 ```bash
-# AudioReach fastrpc from Yocto recipe
+# AudioReach PAL from Yocto recipe
 python3 scripts/debian_packager.py \
-    --recipe meta-qcom/recipes-support/fastrpc/fastrpc_1.0.6.bb \
-    --output /tmp/fastrpc-deb
+    --recipe meta-qcom/recipes-audioreach/audioreach-pal/audioreach-pal_1.0.2.bb \
+    --output /tmp/audioreach-pal-deb
 
-# Prebuilt FastCV binaries
+# AudioReach audio-utils prebuilt
 python3 scripts/debian_packager.py \
-    --recipe meta-qcom/recipes-multimedia/fastcv/qcom-fastcv-binaries_1.8.6.bb \
-    --output /tmp/fastcv-deb
+    --recipe meta-qcom/recipes-audioreach/audioreach-audio-utils/audioreach-audio-utils_1.0.0.bb \
+    --output /tmp/audioreach-audio-utils-deb
 
-# DKMS kernel module from recipe
+# AudioReach kernel module (DKMS) from recipe
 python3 scripts/debian_packager.py \
-    --recipe meta-qcom/recipes-kernel/kgsl/kgsl_git.bb \
-    --output /tmp/kgsl-deb
+    --recipe meta-qcom/recipes-audioreach/audioreach-kernel/audioreach-kernel_git.bb \
+    --output /tmp/audioreach-kernel-deb
 
 # Source package from git URL
 python3 scripts/debian_packager.py \
-    --url https://github.com/qualcomm/fastrpc \
-    --output /tmp/fastrpc-deb
+    --url https://github.com/AudioReach/audioreach-pipewire-plugin \
+    --output /tmp/audioreach-pipewire-plugin-deb
 
 # Prebuilt from tarball URL
 python3 scripts/debian_packager.py \
-    --url https://example.com/libfoo_1.2_arm64.tar.gz \
-    --output /tmp/libfoo-deb
+    --url https://github.com/AudioReach/audioreach-audio-utils/archive/refs/tags/v1.0.0.tar.gz \
+    --output /tmp/audioreach-audio-utils-deb
 
-# DKMS from local driver tree
+# AudioReach kernel module from local tree
 python3 scripts/debian_packager.py \
-    --path ./my-kernel-driver \
+    --path ./audioreach-kernel \
     --dkms \
-    --output /tmp/driver-deb
+    --output /tmp/audioreach-kernel-deb
 
 # Dry-run to preview without writing
 python3 scripts/debian_packager.py \
-    --recipe meta-qcom/recipes-support/fastrpc/fastrpc_1.0.6.bb \
+    --recipe meta-qcom/recipes-audioreach/audioreach-pal/audioreach-pal_1.0.2.bb \
     --dry-run --verbose
 ```
 

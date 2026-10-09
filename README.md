@@ -57,9 +57,9 @@ Generates a production-ready `debian/` directory tree, `build.sh`, `gbp.conf`,
 
 | Input | Example |
 |---|---|
-| Yocto `.bb` recipe | `fastrpc_1.0.6.bb` |
-| Remote git or tarball URL | `https://github.com/qualcomm/fastrpc` |
-| Local source tree or tarball | `./my-driver/` or `./libfoo_1.2_arm64.tar.gz` |
+| Yocto `.bb` recipe | `audioreach-pal_1.0.2.bb` |
+| Remote git or tarball URL | `https://github.com/AudioReach/audioreach-pal` |
+| Local source tree or tarball | `./audioreach-pal/` or `./audioreach-audio-utils_1.0.0_arm64.tar.gz` |
 
 Automatically detects and handles three package types:
 
@@ -72,28 +72,28 @@ Automatically detects and handles three package types:
 ```bash
 # From a Yocto recipe
 python3 skills/debian-packager/scripts/debian_packager.py \
-    --recipe meta-qcom/recipes-support/fastrpc/fastrpc_1.0.6.bb \
-    --output /tmp/fastrpc-deb
+    --recipe meta-qcom/recipes-audioreach/audioreach-pal/audioreach-pal_1.0.2.bb \
+    --output /tmp/audioreach-pal-deb
 
 # From a git URL
 python3 skills/debian-packager/scripts/debian_packager.py \
-    --url https://github.com/qualcomm/fastrpc \
-    --output /tmp/fastrpc-deb
+    --url https://github.com/AudioReach/audioreach-pipewire-plugin \
+    --output /tmp/audioreach-pipewire-plugin-deb
 
 # From a prebuilt tarball URL
 python3 skills/debian-packager/scripts/debian_packager.py \
-    --url https://example.com/libfoo_1.2_arm64.tar.gz \
-    --output /tmp/libfoo-deb
+    --url https://github.com/AudioReach/audioreach-audio-utils/archive/refs/tags/v1.0.0.tar.gz \
+    --output /tmp/audioreach-audio-utils-deb
 
 # From a local DKMS driver tree
 python3 skills/debian-packager/scripts/debian_packager.py \
-    --path ./my-kernel-driver \
+    --path ./audioreach-kernel \
     --dkms \
-    --output /tmp/driver-deb
+    --output /tmp/audioreach-kernel-deb
 
 # Dry-run preview (no files written)
 python3 skills/debian-packager/scripts/debian_packager.py \
-    --recipe kgsl_git.bb \
+    --recipe meta-qcom/recipes-audioreach/audioreach-pal/audioreach-pal_1.0.2.bb \
     --dry-run --verbose
 ```
 
@@ -121,7 +121,7 @@ debian-out/
 ### Build the package
 
 ```bash
-cd /tmp/fastrpc-deb
+cd /tmp/audioreach-pal-deb
 bash build.sh
 
 # Validate
