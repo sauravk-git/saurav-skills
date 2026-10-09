@@ -58,6 +58,179 @@ def die(msg: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Auto-versioning helpers
+# ---------------------------------------------------------------------------
+
+def _fetch_latest_github_tag(owner: str, repo: str) -> Optional[str]:
+    """Query the GitHub API for the latest semver tag. Returns bare version string or None."""
+    try:
+        url = f"https://api.github.com/repos/{owner}/{repo}/tags?per_page=20"
+        req = urllib.request.Request(url, headers={"Accept": "application/vnd.github.v3+json",
+                                                    "User-Agent": "debian-packager-skill/1.0"})
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            tags = json.loads(resp.read())
+        # Pick the first tag that looks like a semver (v1.2.3 or 1.2.3)
+        for tag in tags:
+            name = tag.get("name", "")
+            m = re.match(r"^v?(\d+\.\d+[\.\d]*)$", name)
+            if m:
+                log(f"GitHub latest tag for {owner}/{repo}: {name}")
+                return m.group(1)
+    except Exception as exc:
+        log(f"GitHub tag lookup failed for {owner}/{repo}: {exc}")
+    return None
+
+
+def _fetch_latest_gitlab_tag(host: str, owner: str, repo: str) -> Optional[str]:
+    """Query a GitLab API for the latest semver tag. Returns bare version string or None."""
+    try:
+        project = urllib.request.quote(f"{owner}/{repo}", safe="")
+        url = f"https://{host}/api/v4/projects/{project}/repository/tags?per_page=20&order_by=version"
+        req = urllib.request.Request(url, headers={"User-Agent": "debian-packager-skill/1.0"})
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            tags = json.loads(resp.read())
+        for tag in tags:
+            name = tag.get("name", "")
+            m = re.match(r"^v?(\d+\.\d+[\.\d]*)$", name)
+            if m:
+                log(f"GitLab latest tag for {owner}/{repo}: {name}")
+                return m.group(1)
+    except Exception as exc:
+        log(f"GitLab tag lookup failed for {host}/{owner}/{repo}: {exc}")
+    return None
+
+
+def _resolve_version_from_url(url: str) -> Optional[str]:
+    """
+    Try to resolve the latest release version for a git URL by querying
+    the GitHub or GitLab API. Falls back to None if unavailable.
+    """
+    # GitHub: https://github.com/<owner>/<repo>[.git]
+    m = re.match(r"https?://github\.com/([^/]+)/([^/\.]+)", url)
+    if m:
+        return _fetch_latest_github_tag(m.group(1), m.group(2))
+
+    # GitLab SaaS: https://gitlab.com/<owner>/<repo>[.git]
+    m = re.match(r"https?://gitlab\.com/([^/]+)/([^/\.]+)", url)
+    if m:
+        return _fetch_latest_gitlab_tag("gitlab.com", m.group(1), m.group(2))
+
+    # Self-hosted GitLab (heuristic — path has at least owner/repo)
+    m = re.match(r"https?://([^/]+)/([^/]+)/([^/\.]+)", url)
+    if m:
+        host, owner, repo = m.group(1), m.group(2), m.group(3)
+        if host not in ("github.com", "gitlab.com"):
+            return _fetch_latest_gitlab_tag(host, owner, repo)
+
+    return None
+
+
+def _resolve_version_from_local(path: Path) -> Optional[str]:
+    """
+    Try to resolve the version from a local git clone using git describe,
+    then git log for date-based snapshots, then a VERSION/version.txt file.
+    Returns a bare version string or None.
+    """
+    if not (path / ".git").exists():
+        # Check for a VERSION or version.txt file
+        for vfile in ["VERSION", "version.txt", "version", "VERSION.txt"]:
+            vpath = path / vfile
+            if vpath.exists():
+                raw = vpath.read_text().strip().splitlines()[0].strip()
+                m = re.match(r"v?(\d+\.\d+[\.\d]*)", raw)
+                if m:
+                    log(f"Version from {vfile}: {m.group(1)}")
+                    return m.group(1)
+        return None
+
+    # git describe --tags --abbrev=0 — exact tag
+    try:
+        result = subprocess.run(
+            ["git", "describe", "--tags", "--abbrev=0"],
+            cwd=str(path), capture_output=True, text=True, timeout=10
+        )
+        if result.returncode == 0:
+            tag = result.stdout.strip()
+            m = re.match(r"^v?(\d+\.\d+[\.\d]*)$", tag)
+            if m:
+                log(f"git describe exact tag: {tag}")
+                return m.group(1)
+            # Annotated tag with distance: v1.0.2-14-gabcdef → 1.0.2+git<date>
+            m = re.match(r"^v?(\d+\.\d+[\.\d]*)-\d+-g[0-9a-f]+$", tag)
+            if m:
+                date_str = _git_commit_date(path)
+                ver = f"{m.group(1)}+git{date_str}"
+                log(f"git describe with distance → snapshot version: {ver}")
+                return ver
+    except Exception as exc:
+        log(f"git describe failed: {exc}")
+
+    # Fallback: date-based snapshot from latest commit
+    date_str = _git_commit_date(path)
+    if date_str:
+        ver = f"0+git{date_str}"
+        log(f"No tag found — using date snapshot: {ver}")
+        return ver
+
+    return None
+
+
+def _git_commit_date(path: Path) -> str:
+    """Return YYYYMMDD of the latest commit, or today's date as fallback."""
+    try:
+        result = subprocess.run(
+            ["git", "log", "-1", "--format=%cd", "--date=format:%Y%m%d"],
+            cwd=str(path), capture_output=True, text=True, timeout=10
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+    except Exception:
+        pass
+    return datetime.datetime.now().strftime("%Y%m%d")
+
+
+def _auto_debian_revision(output_dir: str, upstream_version: str) -> str:
+    """
+    Determine the correct debian revision automatically:
+    - If the output dir does not exist yet → revision 1 (first packaging).
+    - If it exists and contains a changelog with the same upstream version
+      → increment the existing revision by 1 (re-packaging).
+    - If it exists with a different upstream version → reset to 1.
+    """
+    changelog = Path(output_dir) / "debian" / "changelog"
+    if not changelog.exists():
+        log("No existing changelog found — debian revision: 1")
+        return "1"
+
+    try:
+        first_line = changelog.read_text().splitlines()[0]
+        # e.g. "audioreach-pal (1.0.2-3) trixie; urgency=medium"
+        m = re.match(r"^\S+\s+\(([^)]+)\)", first_line)
+        if not m:
+            return "1"
+        existing_full = m.group(1)          # e.g. "1.0.2-3"
+        parts = existing_full.rsplit("-", 1)
+        existing_upstream = parts[0]
+        existing_rev = parts[1] if len(parts) == 2 else "1"
+
+        if existing_upstream == upstream_version:
+            # Same upstream — bump revision
+            try:
+                new_rev = str(int(existing_rev) + 1)
+            except ValueError:
+                # Non-numeric revision (e.g. 0~rc1) — append .1
+                new_rev = existing_rev + ".1"
+            log(f"Same upstream {upstream_version} already packaged at rev {existing_rev} → bumping to {new_rev}")
+            return new_rev
+        else:
+            log(f"Upstream changed {existing_upstream} → {upstream_version} — resetting revision to 1")
+            return "1"
+    except Exception as exc:
+        log(f"Could not read existing changelog: {exc}")
+        return "1"
+
+
+# ---------------------------------------------------------------------------
 # Data model
 # ---------------------------------------------------------------------------
 class PackageManifest:
@@ -159,7 +332,16 @@ def parse_recipe(recipe_path: str, manifest: PackageManifest) -> None:
     if "PN" in vars_:
         manifest.pkg_name = _sanitize_pkg_name(vars_["PN"])
     if "PV" in vars_:
-        manifest.upstream_version = vars_["PV"].lstrip("v").replace("+git", "")
+        raw_pv = vars_["PV"].lstrip("v")
+        # Normalise Yocto git/AUTOINC PV patterns to a usable version
+        # e.g. "1.0+git${AUTOREV}" → "1.0+git<today>", "git" → "0+git<today>"
+        if re.search(r'git|AUTOINC|AUTOREV', raw_pv):
+            date_str = datetime.datetime.now().strftime("%Y%m%d")
+            base = re.sub(r'\$\{[^}]+\}|AUTOINC\+|\+?git.*', '', raw_pv).strip("+- ")
+            manifest.upstream_version = f"{base}+git{date_str}" if base else f"0+git{date_str}"
+            log(f"Normalised git PV '{raw_pv}' → '{manifest.upstream_version}'")
+        else:
+            manifest.upstream_version = raw_pv.replace("+git", "")
 
     manifest.summary = vars_.get("SUMMARY", vars_.get("DESCRIPTION", manifest.summary))
     manifest.description = vars_.get("DESCRIPTION", manifest.description)
@@ -257,6 +439,11 @@ def parse_url(url: str, manifest: PackageManifest, force_dkms: bool = False,
         manifest.upstream_url = url
         manifest.vcs_git = url
         _name_version_from_url(url, manifest)
+        if manifest.upstream_version == "0.0.1":
+            resolved = _resolve_version_from_url(url)
+            if resolved:
+                manifest.upstream_version = resolved
+                log(f"Auto-resolved upstream version from API (dkms): {resolved}")
         manifest.dkms_module_name = manifest.pkg_name
         manifest.dkms_module_version = manifest.upstream_version
         manifest.build_depends.extend(["dkms", "linux-headers-generic"])
@@ -266,6 +453,12 @@ def parse_url(url: str, manifest: PackageManifest, force_dkms: bool = False,
         manifest.vcs_git = url
         manifest.vcs_browser = re.sub(r'\.git$', '', url)
         _name_version_from_url(url, manifest)
+        # Auto-resolve version from GitHub/GitLab API if not found in URL
+        if manifest.upstream_version == "0.0.1":
+            resolved = _resolve_version_from_url(url)
+            if resolved:
+                manifest.upstream_version = resolved
+                log(f"Auto-resolved upstream version from API: {resolved}")
 
 
 def _name_version_from_url(url: str, manifest: PackageManifest) -> None:
@@ -336,6 +529,12 @@ def parse_local(local_path: str, manifest: PackageManifest, force_dkms: bool = F
 
     # Try to read name from directory
     manifest.pkg_name = _sanitize_pkg_name(path.name.rsplit("_", 1)[0].rsplit("-", 1)[0])
+
+    # Auto-resolve version from git describe / VERSION file
+    resolved = _resolve_version_from_local(path)
+    if resolved:
+        manifest.upstream_version = resolved
+        log(f"Auto-resolved upstream version from local repo: {resolved}")
 
     # Detect build system
     if (path / "CMakeLists.txt").exists():
@@ -939,9 +1138,15 @@ def main() -> None:
     if args.upstream_version:
         manifest.upstream_version = args.upstream_version.lstrip("v")
         log(f"Upstream version overridden to: {manifest.upstream_version}")
-    if args.debian_revision:
+
+    # Auto-determine debian revision unless explicitly provided by the user
+    _explicit_revision = (args.debian_revision != "1")  # "1" is the argparse default
+    if _explicit_revision:
         manifest.debian_revision = args.debian_revision
-        log(f"Debian revision set to: {manifest.debian_revision}")
+        log(f"Debian revision explicitly set to: {manifest.debian_revision}")
+    else:
+        manifest.debian_revision = _auto_debian_revision(args.output, manifest.upstream_version)
+        log(f"Auto debian revision: {manifest.debian_revision}")
 
     # Override type flags
     if args.source:

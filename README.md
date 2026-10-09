@@ -120,61 +120,54 @@ debian-out/
 
 ### Versioning
 
-Debian package versions follow the format `<upstream_version>-<debian_revision>`.
-Both are controlled via CLI flags and override whatever is auto-detected.
+Versioning is **fully automatic** — no flags needed for normal use.
 
-| Flag | Default | Purpose |
+#### What gets resolved automatically
+
+| Input | Upstream version source | Debian revision logic |
 |---|---|---|
-| `--upstream-version VER` | parsed from input | Override the upstream version |
-| `--debian-revision REV` | `1` | Set the Debian revision suffix |
+| `--url` (GitHub/GitLab) | GitHub/GitLab API → latest semver tag | `1` first time; auto-increments on re-run |
+| `--url` (tarball) | Parsed from filename | same |
+| `--recipe` | `PV` field; `git`/AUTOINC PV → `<base>+git<YYYYMMDD>` | same |
+| `--path` (git clone) | `git describe --tags`; dirty tree → `<ver>+git<YYYYMMDD>` | same |
+| `--path` (non-git) | `VERSION` / `version.txt` file | same |
+| Fallback | `0+git<YYYYMMDD>` | same |
 
-**Debian revision rules:**
+The Debian revision is auto-bumped when the output directory already
+contains a `debian/changelog` for the same upstream version:
 
-| Situation | Revision | Resulting version |
-|---|---|---|
-| First packaging of an upstream release | `1` | `1.0.2-1` |
-| Packaging fix, same upstream source | increment | `1.0.2-2`, `1.0.2-3` |
-| Release candidate | `0~rcN` | `1.0.3-0~rc1` |
-| Beta snapshot | `0~betaN` | `1.0.3-0~beta2` |
-| Git date snapshot | `0~gitYYYYMMDD` | `1.0.3-0~git20261009` |
-| Backport to older suite | `N~bpo<suite>+M` | `1.0.2-1~bpo12+1` |
+```
+first run   → 1.0.2-1
+second run  → 1.0.2-2   (re-packaging, upstream unchanged)
+new upstream→ 1.0.3-1   (upstream changed, revision resets)
+```
 
-> `0~` prefixes sort *before* the bare version in `dpkg --compare-versions`,
-> so pre-releases always lose to the final release.
+#### Override flags (only when needed)
 
 ```bash
-# First packaging
+# Fully automatic
 python3 skills/debian-packager/scripts/debian_packager.py \
     --url https://github.com/AudioReach/audioreach-pal \
-    --upstream-version 1.0.2 --debian-revision 1 \
     --output /tmp/audioreach-pal-deb
-# → 1.0.2-1
+# → GitHub API finds v1.0.2 → writes 1.0.2-1
 
-# Re-package after a debian/ fix
-python3 skills/debian-packager/scripts/debian_packager.py \
-    --url https://github.com/AudioReach/audioreach-pal \
-    --upstream-version 1.0.2 --debian-revision 2 \
-    --output /tmp/audioreach-pal-deb
-# → 1.0.2-2
-
-# Release candidate
+# Force a pre-release revision
 python3 skills/debian-packager/scripts/debian_packager.py \
     --url https://github.com/AudioReach/audioreach-pipewire-plugin \
     --upstream-version 1.0.3 --debian-revision 0~rc1 \
     --output /tmp/audioreach-pipewire-plugin-deb
 # → 1.0.3-0~rc1
-
-# Git snapshot
-python3 skills/debian-packager/scripts/debian_packager.py \
-    --url https://github.com/AudioReach/audioreach-pal \
-    --upstream-version 1.0.3 --debian-revision 0~git20261009 \
-    --output /tmp/audioreach-pal-deb
-# → 1.0.3-0~git20261009
-
-# Verify ordering
-dpkg --compare-versions 1.0.2-0~rc1 lt 1.0.2-1  && echo "rc < release: correct"
-dpkg --compare-versions 1.0.2-1     lt 1.0.2-2  && echo "rev1 < rev2:  correct"
 ```
+
+#### Version format quick reference
+
+| Version | Meaning |
+|---|---|
+| `1.0.2-1` | First packaging of upstream 1.0.2 |
+| `1.0.2-2` | Re-packaging (debian/ fix only) |
+| `1.0.3-0~rc1` | Release candidate (sorts before `1.0.3-1`) |
+| `0+git20261009-1` | Git snapshot, no upstream tag |
+| `1.0.2-1~bpo12+1` | Backport to bookworm |
 
 
 ### Build the package

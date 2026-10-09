@@ -197,109 +197,89 @@ uscan --no-download --verbose
 
 ## Versioning Guidelines
 
-Debian package versions follow the format:
+Versioning is **fully automatic** — the skill resolves both the upstream
+version and the Debian revision without any manual input. You only need
+the override flags when auto-detection cannot reach the right answer.
 
-```
-<upstream_version>-<debian_revision>
-```
+### How versions are resolved automatically
 
-Both components are controlled via CLI flags and are applied on top of
-whatever version is auto-detected from the recipe, URL, or path.
+#### Upstream version
 
-### Flags
+The skill tries each source in order, stopping at the first hit:
 
-| Flag | Default | Purpose |
-|---|---|---|
-| `--upstream-version VER` | parsed from input | Override the upstream version component |
-| `--debian-revision REV` | `1` | Set the Debian revision suffix |
+| Input mode | Resolution strategy |
+|---|---|
+| Yocto recipe (`--recipe`) | `PV` field; git/AUTOINC PV normalised to `<base>+git<YYYYMMDD>` |
+| Git URL (`--url`) | GitHub / GitLab API → latest semver tag |
+| Tarball URL (`--url`) | Parsed from the filename (e.g. `foo_1.2.tar.gz` → `1.2`) |
+| Local git clone (`--path`) | `git describe --tags --abbrev=0`; falls back to `<ver>+git<YYYYMMDD>` for dirty trees |
+| Local non-git dir (`--path`) | Reads `VERSION` / `version.txt` file if present |
+| Fallback | `0+git<YYYYMMDD>` (always produces a valid, sortable version) |
 
-### Upstream Version (`--upstream-version`)
+#### Debian revision
 
-The upstream version reflects the version of the software being packaged.
-It is auto-detected from:
-- `PV` field in a Yocto recipe
-- Tag or filename in a URL (e.g. `v1.0.2` → `1.0.2`)
-- Directory or tarball name for local paths
+| Situation | Auto-selected revision |
+|---|---|
+| Output directory does not exist yet | `1` (first packaging) |
+| Output dir exists, same upstream version | existing revision + 1 (re-packaging) |
+| Output dir exists, different upstream version | `1` (new upstream, reset) |
 
-Use `--upstream-version` to override when auto-detection gives a wrong or
-missing result (e.g. `git` recipes with no numeric `PV`).
+### Override flags (when you need them)
+
+| Flag | When to use |
+|---|---|
+| `--upstream-version VER` | API unreachable, private repo, or you want to pin a specific version |
+| `--debian-revision REV` | Force a specific revision (e.g. `0~rc1`, `0~git20261009`, backport suffix) |
 
 ```bash
-# Recipe has PV = "git" — override with the real release version
+# Fully automatic — version and revision resolved without any flags
+python3 scripts/debian_packager.py \
+    --url https://github.com/AudioReach/audioreach-pal \
+    --output /tmp/audioreach-pal-deb
+# → queries GitHub API → finds v1.0.2 → writes 1.0.2-1
+
+# Run again on the same output dir (re-packaging)
+python3 scripts/debian_packager.py \
+    --url https://github.com/AudioReach/audioreach-pal \
+    --output /tmp/audioreach-pal-deb
+# → same upstream 1.0.2 already in changelog → writes 1.0.2-2
+
+# Local git clone — uses git describe
+python3 scripts/debian_packager.py \
+    --path ./audioreach-pal \
+    --output /tmp/audioreach-pal-deb
+# → git describe → v1.0.2 → writes 1.0.2-1
+
+# git recipe with AUTOINC PV — normalised to date snapshot
 python3 scripts/debian_packager.py \
     --recipe audioreach-kernel_git.bb \
-    --upstream-version 1.0.2 \
     --output /tmp/audioreach-kernel-deb
-```
+# → PV="git" → 0+git20261009-1
 
-### Debian Revision (`--debian-revision`)
-
-The Debian revision tracks changes to the packaging itself, independent
-of the upstream source. Follow these rules:
-
-| Situation | Revision to use | Example |
-|---|---|---|
-| First packaging of an upstream release | `1` | `1.0.2-1` |
-| Packaging fix, same upstream source | increment by 1 | `1.0.2-2`, `1.0.2-3` |
-| Pre-release / release candidate | `0~rcN` | `1.0.3-0~rc1` |
-| Beta snapshot | `0~betaN` | `1.0.3-0~beta2` |
-| Git snapshot (date-based) | `0~gitYYYYMMDD` | `1.0.3-0~git20261009` |
-| Backport to older distro | `N~bpo<suite>+M` | `1.0.2-1~bpo12+1` |
-| Native package (no upstream/debian split) | omit revision | `1.0.2` |
-
-> **Rule of thumb:** `0~` prefixes sort *before* the bare version in
-> `dpkg --compare-versions`, so pre-releases always lose to the final
-> release — exactly the right behaviour.
-
-```bash
-# First packaging
-python3 scripts/debian_packager.py \
-    --url https://github.com/AudioReach/audioreach-pal \
-    --upstream-version 1.0.2 --debian-revision 1 \
-    --output /tmp/audioreach-pal-deb
-# → version: 1.0.2-1
-
-# Re-package after a debian/ fix (upstream unchanged)
-python3 scripts/debian_packager.py \
-    --url https://github.com/AudioReach/audioreach-pal \
-    --upstream-version 1.0.2 --debian-revision 2 \
-    --output /tmp/audioreach-pal-deb
-# → version: 1.0.2-2
-
-# Release candidate
+# Override only when needed (private repo, no API access)
 python3 scripts/debian_packager.py \
     --url https://github.com/AudioReach/audioreach-pipewire-plugin \
     --upstream-version 1.0.3 --debian-revision 0~rc1 \
     --output /tmp/audioreach-pipewire-plugin-deb
-# → version: 1.0.3-0~rc1
-
-# Git snapshot
-python3 scripts/debian_packager.py \
-    --url https://github.com/AudioReach/audioreach-pal \
-    --upstream-version 1.0.3 --debian-revision 0~git20261009 \
-    --output /tmp/audioreach-pal-deb
-# → version: 1.0.3-0~git20261009
+# → 1.0.3-0~rc1
 ```
 
-### Version Comparison Quick Reference
+### Version format reference
 
 ```
-dpkg --compare-versions 1.0.2-0~rc1 lt 1.0.2-1   # true  — rc < release
-dpkg --compare-versions 1.0.2-1     lt 1.0.2-2   # true  — rev 1 < rev 2
-dpkg --compare-versions 1.0.2-2     lt 1.0.3-1   # true  — older upstream
+<upstream_version>-<debian_revision>
+
+1.0.2-1          first packaging of upstream 1.0.2
+1.0.2-2          re-packaging (debian/ fix, upstream unchanged)
+1.0.3-0~rc1      release candidate  (sorts before 1.0.3-1)
+1.0.3-0~beta2    beta               (sorts before 1.0.3-0~rc1)
+0+git20261009-1  git snapshot with no tag
+1.0.2-1~bpo12+1  backport to bookworm
 ```
 
-### Epoch (advanced)
-
-If an upstream project resets its version numbering (e.g. goes from `2.x`
-back to `1.x`), prepend an epoch to force the correct ordering:
-
-```
-2:1.0.2-1
-```
-
-Epochs are rarely needed and cannot be removed once published. Use only
-when unavoidable. Set via `--upstream-version 2:1.0.2` if required.
+> `0~` and `0+git` prefixes sort *before* the bare release in
+> `dpkg --compare-versions`, so snapshots and pre-releases never
+> accidentally supersede a final release.
 
 
 ---
