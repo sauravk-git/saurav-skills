@@ -118,6 +118,65 @@ debian-out/
 └── debusine.yaml          # Debusine CI hints
 ```
 
+### Versioning
+
+Debian package versions follow the format `<upstream_version>-<debian_revision>`.
+Both are controlled via CLI flags and override whatever is auto-detected.
+
+| Flag | Default | Purpose |
+|---|---|---|
+| `--upstream-version VER` | parsed from input | Override the upstream version |
+| `--debian-revision REV` | `1` | Set the Debian revision suffix |
+
+**Debian revision rules:**
+
+| Situation | Revision | Resulting version |
+|---|---|---|
+| First packaging of an upstream release | `1` | `1.0.2-1` |
+| Packaging fix, same upstream source | increment | `1.0.2-2`, `1.0.2-3` |
+| Release candidate | `0~rcN` | `1.0.3-0~rc1` |
+| Beta snapshot | `0~betaN` | `1.0.3-0~beta2` |
+| Git date snapshot | `0~gitYYYYMMDD` | `1.0.3-0~git20261009` |
+| Backport to older suite | `N~bpo<suite>+M` | `1.0.2-1~bpo12+1` |
+
+> `0~` prefixes sort *before* the bare version in `dpkg --compare-versions`,
+> so pre-releases always lose to the final release.
+
+```bash
+# First packaging
+python3 skills/debian-packager/scripts/debian_packager.py \
+    --url https://github.com/AudioReach/audioreach-pal \
+    --upstream-version 1.0.2 --debian-revision 1 \
+    --output /tmp/audioreach-pal-deb
+# → 1.0.2-1
+
+# Re-package after a debian/ fix
+python3 skills/debian-packager/scripts/debian_packager.py \
+    --url https://github.com/AudioReach/audioreach-pal \
+    --upstream-version 1.0.2 --debian-revision 2 \
+    --output /tmp/audioreach-pal-deb
+# → 1.0.2-2
+
+# Release candidate
+python3 skills/debian-packager/scripts/debian_packager.py \
+    --url https://github.com/AudioReach/audioreach-pipewire-plugin \
+    --upstream-version 1.0.3 --debian-revision 0~rc1 \
+    --output /tmp/audioreach-pipewire-plugin-deb
+# → 1.0.3-0~rc1
+
+# Git snapshot
+python3 skills/debian-packager/scripts/debian_packager.py \
+    --url https://github.com/AudioReach/audioreach-pal \
+    --upstream-version 1.0.3 --debian-revision 0~git20261009 \
+    --output /tmp/audioreach-pal-deb
+# → 1.0.3-0~git20261009
+
+# Verify ordering
+dpkg --compare-versions 1.0.2-0~rc1 lt 1.0.2-1  && echo "rc < release: correct"
+dpkg --compare-versions 1.0.2-1     lt 1.0.2-2  && echo "rev1 < rev2:  correct"
+```
+
+
 ### Build the package
 
 ```bash

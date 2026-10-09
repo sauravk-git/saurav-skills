@@ -195,6 +195,115 @@ uscan --no-download --verbose
 
 ---
 
+## Versioning Guidelines
+
+Debian package versions follow the format:
+
+```
+<upstream_version>-<debian_revision>
+```
+
+Both components are controlled via CLI flags and are applied on top of
+whatever version is auto-detected from the recipe, URL, or path.
+
+### Flags
+
+| Flag | Default | Purpose |
+|---|---|---|
+| `--upstream-version VER` | parsed from input | Override the upstream version component |
+| `--debian-revision REV` | `1` | Set the Debian revision suffix |
+
+### Upstream Version (`--upstream-version`)
+
+The upstream version reflects the version of the software being packaged.
+It is auto-detected from:
+- `PV` field in a Yocto recipe
+- Tag or filename in a URL (e.g. `v1.0.2` → `1.0.2`)
+- Directory or tarball name for local paths
+
+Use `--upstream-version` to override when auto-detection gives a wrong or
+missing result (e.g. `git` recipes with no numeric `PV`).
+
+```bash
+# Recipe has PV = "git" — override with the real release version
+python3 scripts/debian_packager.py \
+    --recipe audioreach-kernel_git.bb \
+    --upstream-version 1.0.2 \
+    --output /tmp/audioreach-kernel-deb
+```
+
+### Debian Revision (`--debian-revision`)
+
+The Debian revision tracks changes to the packaging itself, independent
+of the upstream source. Follow these rules:
+
+| Situation | Revision to use | Example |
+|---|---|---|
+| First packaging of an upstream release | `1` | `1.0.2-1` |
+| Packaging fix, same upstream source | increment by 1 | `1.0.2-2`, `1.0.2-3` |
+| Pre-release / release candidate | `0~rcN` | `1.0.3-0~rc1` |
+| Beta snapshot | `0~betaN` | `1.0.3-0~beta2` |
+| Git snapshot (date-based) | `0~gitYYYYMMDD` | `1.0.3-0~git20261009` |
+| Backport to older distro | `N~bpo<suite>+M` | `1.0.2-1~bpo12+1` |
+| Native package (no upstream/debian split) | omit revision | `1.0.2` |
+
+> **Rule of thumb:** `0~` prefixes sort *before* the bare version in
+> `dpkg --compare-versions`, so pre-releases always lose to the final
+> release — exactly the right behaviour.
+
+```bash
+# First packaging
+python3 scripts/debian_packager.py \
+    --url https://github.com/AudioReach/audioreach-pal \
+    --upstream-version 1.0.2 --debian-revision 1 \
+    --output /tmp/audioreach-pal-deb
+# → version: 1.0.2-1
+
+# Re-package after a debian/ fix (upstream unchanged)
+python3 scripts/debian_packager.py \
+    --url https://github.com/AudioReach/audioreach-pal \
+    --upstream-version 1.0.2 --debian-revision 2 \
+    --output /tmp/audioreach-pal-deb
+# → version: 1.0.2-2
+
+# Release candidate
+python3 scripts/debian_packager.py \
+    --url https://github.com/AudioReach/audioreach-pipewire-plugin \
+    --upstream-version 1.0.3 --debian-revision 0~rc1 \
+    --output /tmp/audioreach-pipewire-plugin-deb
+# → version: 1.0.3-0~rc1
+
+# Git snapshot
+python3 scripts/debian_packager.py \
+    --url https://github.com/AudioReach/audioreach-pal \
+    --upstream-version 1.0.3 --debian-revision 0~git20261009 \
+    --output /tmp/audioreach-pal-deb
+# → version: 1.0.3-0~git20261009
+```
+
+### Version Comparison Quick Reference
+
+```
+dpkg --compare-versions 1.0.2-0~rc1 lt 1.0.2-1   # true  — rc < release
+dpkg --compare-versions 1.0.2-1     lt 1.0.2-2   # true  — rev 1 < rev 2
+dpkg --compare-versions 1.0.2-2     lt 1.0.3-1   # true  — older upstream
+```
+
+### Epoch (advanced)
+
+If an upstream project resets its version numbering (e.g. goes from `2.x`
+back to `1.x`), prepend an epoch to force the correct ordering:
+
+```
+2:1.0.2-1
+```
+
+Epochs are rarely needed and cannot be removed once published. Use only
+when unavoidable. Set via `--upstream-version 2:1.0.2` if required.
+
+
+---
+
 ## Advanced Options
 
 ```
@@ -204,6 +313,8 @@ uscan --no-download --verbose
 --local FILE/DIR     Alias for --path (accepts file or directory)
 --output DIR         Where to write the debian/ skeleton (default: ./debian-out)
 --maintainer STR     "Name <email>" string for changelog/control
+--upstream-version VER  Override upstream version (e.g. 1.0.2)
+--debian-revision REV   Debian revision suffix (default: 1; use 0~rc1 for pre-releases)
 --dkms               Force DKMS package type
 --prebuilt           Force prebuilt package type
 --source             Force source/userspace package type

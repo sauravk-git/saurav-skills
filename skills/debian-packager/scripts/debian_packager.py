@@ -881,6 +881,8 @@ def build_parser() -> argparse.ArgumentParser:
               %(prog)s --url https://example.com/libfoo_1.2_arm64.tar.gz
               %(prog)s --path ./my-driver --dkms
               %(prog)s --recipe kgsl_git.bb --output /tmp/kgsl-deb --dry-run
+              %(prog)s --url https://github.com/AudioReach/audioreach-pal --upstream-version 1.0.2 --debian-revision 1
+              %(prog)s --url https://github.com/AudioReach/audioreach-pal --upstream-version 1.0.3 --debian-revision 0~rc1
         """),
     )
     src = p.add_mutually_exclusive_group(required=True)
@@ -892,6 +894,12 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Output directory (default: ./debian-out)")
     p.add_argument("--maintainer", metavar="STR",
                    help='"Name <email>" for changelog/control')
+    p.add_argument("--upstream-version", metavar="VER",
+                   help="Override upstream version (e.g. 1.0.2). Overrides value parsed from recipe/URL/path.")
+    p.add_argument("--debian-revision", metavar="REV", default="1",
+                   help="Debian revision suffix appended to upstream version (default: 1). "
+                        "Increment for re-packaging the same upstream release (e.g. 2, 3). "
+                        "Use 0~<qualifier> for pre-releases (e.g. 0~rc1).")
     p.add_argument("--dkms", action="store_true", help="Force DKMS package type")
     p.add_argument("--prebuilt", action="store_true", help="Force prebuilt package type")
     p.add_argument("--source", action="store_true", help="Force source/userspace package type")
@@ -926,6 +934,14 @@ def main() -> None:
     elif args.path:
         info(f"Parsing local path: {args.path}")
         parse_local(args.path, manifest, force_dkms=args.dkms, force_prebuilt=args.prebuilt)
+
+    # Apply version overrides (CLI takes precedence over parsed values)
+    if args.upstream_version:
+        manifest.upstream_version = args.upstream_version.lstrip("v")
+        log(f"Upstream version overridden to: {manifest.upstream_version}")
+    if args.debian_revision:
+        manifest.debian_revision = args.debian_revision
+        log(f"Debian revision set to: {manifest.debian_revision}")
 
     # Override type flags
     if args.source:
