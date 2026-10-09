@@ -555,50 +555,49 @@ def parse_local(local_path: str, manifest: PackageManifest, force_dkms: bool = F
 def generate_control(m: PackageManifest) -> str:
     bd = ", ".join(sorted(set(m.build_depends)))
     deps = ", ".join(sorted(set(m.depends)))
+
+    # Build optional header lines — each must end with \n or be empty string
     vcs_lines = ""
     if m.vcs_git:
-        vcs_lines = f"Vcs-Git: {m.vcs_git}\n"
+        vcs_lines += f"Vcs-Git: {m.vcs_git}\n"
     if m.vcs_browser:
         vcs_lines += f"Vcs-Browser: {m.vcs_browser}\n"
     homepage_line = f"Homepage: {m.homepage}\n" if m.homepage else ""
 
-    source_stanza = textwrap.dedent(f"""\
-        Source: {m.source_name}
-        Section: libs
-        Priority: optional
-        Maintainer: {m.maintainer}
-        Build-Depends: {bd}
-        Standards-Version: 4.6.2
-        Rules-Requires-Root: no
-        {homepage_line}{vcs_lines}
-    """).rstrip()
+    # Source stanza — every field at column 0 (no textwrap.dedent indentation trap)
+    source_stanza = (
+        f"Source: {m.source_name}\n"
+        f"Section: libs\n"
+        f"Priority: optional\n"
+        f"Maintainer: {m.maintainer}\n"
+        f"Build-Depends: {bd}\n"
+        f"Standards-Version: 4.6.2\n"
+        f"Rules-Requires-Root: no\n"
+        f"{homepage_line}"
+        f"{vcs_lines}"
+    ).rstrip()
 
     desc_wrapped = _wrap_description(m.summary, m.description)
 
+    # Binary stanza(s) — every field at column 0
+    def _binary(pkg_name: str, arch: str, dep_line: str) -> str:
+        return (
+            f"Package: {pkg_name}\n"
+            f"Architecture: {arch}\n"
+            f"Depends: {dep_line}\n"
+            f"Description: {desc_wrapped}"
+        )
+
     if m.pkg_type == "dkms":
-        binary_stanza = textwrap.dedent(f"""\
-            Package: {m.pkg_name}-dkms
-            Architecture: {m.architecture}
-            Depends: {deps}, dkms
-            Description: {desc_wrapped}
-        """).rstrip()
+        binary_stanza = _binary(
+            f"{m.pkg_name}-dkms", m.architecture, f"{deps}, dkms"
+        )
     elif m.split_packages:
-        binary_stanzas = []
-        for pkg, _ in m.split_packages:
-            binary_stanzas.append(textwrap.dedent(f"""\
-                Package: {pkg}
-                Architecture: {m.architecture}
-                Depends: {deps}
-                Description: {desc_wrapped}
-            """).rstrip())
-        binary_stanza = "\n\n".join(binary_stanzas)
+        binary_stanza = "\n\n".join(
+            _binary(pkg, m.architecture, deps) for pkg, _ in m.split_packages
+        )
     else:
-        binary_stanza = textwrap.dedent(f"""\
-            Package: {m.pkg_name}
-            Architecture: {m.architecture}
-            Depends: {deps}
-            Description: {desc_wrapped}
-        """).rstrip()
+        binary_stanza = _binary(m.pkg_name, m.architecture, deps)
 
     return source_stanza + "\n\n" + binary_stanza + "\n"
 
@@ -1027,27 +1026,96 @@ def _map_license(yocto_license: str) -> str:
 
 
 def _yocto_dep_to_deb(dep: str) -> Optional[str]:
-    """Best-effort mapping of a Yocto dependency name to a Debian package name."""
-    skip = {"virtual/kernel", "virtual/libc", "virtual/libintl", "virtual/crypt"}
+    """
+    Best-effort mapping of a Yocto dependency name to a Debian package name.
+    Prints a WARNING when a dep is not in the table so the user knows to
+    verify the auto-guessed name manually.
+    """
+    skip = {
+        "virtual/kernel", "virtual/libc", "virtual/libintl", "virtual/crypt",
+        "virtual/libgl", "virtual/egl", "virtual/mesa",
+    }
     if dep in skip or dep.startswith("virtual/"):
         return None
+
     mapping = {
-        "libglib-2.0": "libglib2.0-dev",
-        "glib-2.0": "libglib2.0-dev",
-        "zlib": "zlib1g-dev",
-        "openssl": "libssl-dev",
-        "libusb1": "libusb-1.0-0-dev",
-        "libxml2": "libxml2-dev",
-        "libpcre": "libpcre3-dev",
-        "libpng": "libpng-dev",
-        "libjpeg-turbo": "libjpeg-dev",
-        "alsa-lib": "libasound2-dev",
-        "pulseaudio": "libpulse-dev",
-        "dbus": "libdbus-1-dev",
-        "systemd": "libsystemd-dev",
-        "udev": "libudev-dev",
+        # ── glib / GObject ────────────────────────────────────────────────────
+        "libglib-2.0":              "libglib2.0-dev",
+        "glib-2.0":                 "libglib2.0-dev",
+        "glib":                     "libglib2.0-dev",
+        # ── compression / crypto ─────────────────────────────────────────────
+        "zlib":                     "zlib1g-dev",
+        "openssl":                  "libssl-dev",
+        "libssl":                   "libssl-dev",
+        "bzip2":                    "libbz2-dev",
+        "xz":                       "liblzma-dev",
+        "lz4":                      "liblz4-dev",
+        "zstd":                     "libzstd-dev",
+        # ── USB / serial ──────────────────────────────────────────────────────
+        "libusb1":                  "libusb-1.0-0-dev",
+        "libusb":                   "libusb-dev",
+        # ── XML / JSON ────────────────────────────────────────────────────────
+        "libxml2":                  "libxml2-dev",
+        "expat":                    "libexpat1-dev",
+        "libpcre":                  "libpcre3-dev",
+        "libpcre2":                 "libpcre2-dev",
+        "json-c":                   "libjson-c-dev",
+        "jansson":                  "libjansson-dev",
+        # ── image / media ─────────────────────────────────────────────────────
+        "libpng":                   "libpng-dev",
+        "libjpeg-turbo":            "libjpeg-dev",
+        "tiff":                     "libtiff-dev",
+        # ── audio ─────────────────────────────────────────────────────────────
+        "alsa-lib":                 "libasound2-dev",
+        "pulseaudio":               "libpulse-dev",
+        "pipewire":                 "libpipewire-0.3-dev",
+        "tinyalsa":                 "libtinyalsa-dev",
+        "tinycompress":             "libtinycompress-dev",
+        # ── IPC / system ──────────────────────────────────────────────────────
+        "dbus":                     "libdbus-1-dev",
+        "systemd":                  "libsystemd-dev",
+        "udev":                     "libudev-dev",
+        "libcap":                   "libcap-dev",
+        "libseccomp":               "libseccomp-dev",
+        # ── networking ────────────────────────────────────────────────────────
+        "curl":                     "libcurl4-openssl-dev",
+        "libcurl":                  "libcurl4-openssl-dev",
+        # ── graphics / display ────────────────────────────────────────────────
+        "libdrm":                   "libdrm-dev",
+        "wayland":                  "libwayland-dev",
+        # ── AudioReach / Qualcomm platform ───────────────────────────────────
+        "audioreach-pal":           "libaudioreach-pal-dev",
+        "audioreach-graphmgr":      "libaudioreach-graphmgr-dev",
+        "audioreach-graphservices": "libaudioreach-graphservices-dev",
+        "audioreach-conf":          "audioreach-conf",
+        "audioreach-audio-utils":   "libaudioreach-audio-utils-dev",
+        "audioreach-pipewire-plugin": "libaudioreach-pipewire-plugin-dev",
+        "agm":                      "libaudioreach-graphmgr-dev",
+        "pal":                      "libaudioreach-pal-dev",
+        "spf":                      "libspf-dev",
+        "gsl":                      "libgsl-dev",
+        "ar-osal":                  "libar-osal-dev",
+        "ar_osal":                  "libar-osal-dev",
+        "kvh2xml":                  "libkvh2xml-dev",
+        "audioroute":               "libaudioroute-dev",
+        "ats":                      "libats-dev",
+        "gpr":                      "libgpr-dev",
+        "acdb":                     "libacdb-dev",
+        "audio-systems":            "libaudio-systems-dev",
+        "audio-listen":             "libaudio-listen-dev",
+        "vui-interface":            "libvui-interface-dev",
+        "sva-eai":                  "libsva-eai-dev",
+        "capiv2-api-headers":       "libcapiv2-api-headers-dev",
     }
-    return mapping.get(dep, f"lib{dep}-dev")
+
+    if dep in mapping:
+        return mapping[dep]
+
+    # Auto-guess: warn so the user knows to verify
+    guessed = f"lib{dep}-dev"
+    warn(f"Unknown dep '{dep}' — guessing '{guessed}'. "
+         f"Verify this package name is correct in debian/control.")
+    return guessed
 
 
 def _wrap_description(summary: str, description: str) -> str:
