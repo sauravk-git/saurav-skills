@@ -70,6 +70,13 @@ class RpmManifest:
         self.split_packages: list   = []   # [(subpkg_name, summary, files_glob)]
         self.vcs_url: str           = ""
         self.changelog_entries: list = []  # [(date_str, maintainer, ver_rel, notes)]
+        # Generic file/config customisation
+        self.configure_flags: list  = []   # extra --with-xxx flags for %configure
+        self.extra_lib_globs: list  = []   # additional %{_libdir}/*.so globs for %files
+        self.config_globs: list     = []   # %config(noreplace) globs under %{_sysconfdir}
+        self.doc_files: list        = []   # files listed under %doc
+        self.has_devel: bool        = True # whether to emit a -devel subpackage
+        self.has_libs: bool         = True # whether package installs shared libraries
 
     @property
     def full_version(self):
@@ -315,6 +322,13 @@ def parse_recipe(recipe_path: str, manifest: RpmManifest) -> None:
         if files_val:
             manifest.split_packages.append((pkg.lower(), f"Files for {pkg}", files_val))
 
+    # Infer has_libs / has_devel from recipe
+    manifest.has_libs  = any(re.search(r'lib.*\.so', v) for v in vars_.values())
+    manifest.has_devel = manifest.has_libs
+    # Infer doc_files
+    if (Path(recipe_path).parent / "README.md").exists():
+        manifest.doc_files = ["README.md"]
+
 
 def parse_url(url: str, manifest: RpmManifest, force_kmod=False, force_prebuilt=False) -> None:
     is_tarball = bool(re.search(r'\.(tar\.gz|tar\.xz|tar\.bz2|tgz|zip)(\?.*)?$', url))
@@ -343,11 +357,17 @@ def parse_url(url: str, manifest: RpmManifest, force_kmod=False, force_prebuilt=
 
     # Build Source0 URL for git repos
     if not manifest.source0_url and manifest.vcs_url:
-        clean = re.sub(r'\.git$', '', manifest.vcs_url)
+        clean = re.sub(r"\.git$", "", manifest.vcs_url)
         manifest.source0_url = (
             f"{clean}/archive/refs/tags/v%{{version}}.tar.gz"
         )
         manifest.source0_filename = f"{manifest.pkg_name}-%{{version}}.tar.gz"
+
+    # Heuristic: packages named lib* or ending in -lib likely install shared libs
+    name = manifest.pkg_name
+    manifest.has_libs  = bool(re.search(r"^lib|[-_]lib$|[-_]lib[-_]", name))
+    manifest.has_devel = manifest.has_libs
+    manifest.doc_files = ["README.md"]
 
 
 def parse_local(local_path: str, manifest: RpmManifest, force_kmod=False, force_prebuilt=False) -> None:
@@ -391,6 +411,13 @@ def parse_local(local_path: str, manifest: RpmManifest, force_kmod=False, force_
         manifest.upstream_version = resolved
         log(f"Auto-resolved version from local repo: {resolved}")
 
+    # Detect shared library presence
+    so_files = list(path.glob("**/*.so*"))
+    manifest.has_libs  = bool(so_files) or (path / "configure.ac").exists() or (path / "CMakeLists.txt").exists()
+    manifest.has_devel = manifest.has_libs
+    if (path / "README.md").exists():
+        manifest.doc_files = ["README.md"]
+
 # ---------------------------------------------------------------------------
 # Spec file generators
 # ---------------------------------------------------------------------------
@@ -408,8 +435,9 @@ def _build_macros(m: RpmManifest) -> tuple:
 
 def generate_spec(m: RpmManifest) -> str:
     """
-    Generate a .spec file modelled exactly on the real
-    qualcomm-linux/pkg-rpm-audioreach-pal reference spec.
+    Generate a generic RPM .spec file following Fedora/CentOS packaging
+    guidelines. Structure is based on the qualcomm-linux/qcom-rpm-utils
+    dist-git model but is fully generic — works for any package.
     """
     # BuildRequires block
     base_br = ["autoconf", "automake", "libtool", "make", "gcc", "gcc-c++", "pkgconfig"]
@@ -429,9 +457,13 @@ def generate_spec(m: RpmManifest) -> str:
         build_block   = "%build\n%meson\n%meson_build"
         install_block = "%install\n%meson_install"
     else:
-        # autotools — matches the real audioreach-pal spec
+        # autotools / plain make
         prep_block    = "%prep\n%autosetup -n %{name}-%{version}"
-        build_block   = "%build\nautoreconf -fi\n%configure \\\n    --with-glib\n\n%make_build"
+        cfg_flags     = ("\n    " + " \\\n    ".join(m.configure_flags)) if m.configure_flags else ""
+        if cfg_flags:
+            build_block = f"%build\nautoreconf -fi\n%configure {cfg_flags}\n\n%make_build"
+        else:
+            build_block = "%build\nautoreconf -fi\n%configure\n\n%make_build"
         install_block = "%install\n%make_install\nfind %{buildroot} -name '*.la' -delete"
 
     # %files sections
@@ -447,30 +479,49 @@ def generate_spec(m: RpmManifest) -> str:
         files_main  = "%files\n%license LICENSE\n%doc README.md\n%{_libdir}/*"
         files_devel = ""
     else:
-        files_main = (
-            "%files\n"
-            "%license LICENSE\n"
-            f"%{{_libdir}}/lib{m.pkg_name}.so.*\n"
-            f"%{{_libdir}}/libstream_*.so\n"
-            f"%{{_libdir}}/libsession_*.so\n"
-            f"%{{_libdir}}/libdev_*.so\n"
-            f"%{{_libdir}}/libplugin_manager.so\n"
-            "%config(noreplace) %{_sysconfdir}/*.xml"
+        # Generic shared library files — versioned .so.* in main pkg
+        extra_libs = "\n".join(
+            f"%{{_libdir}}/{g}" for g in m.extra_lib_globs
         )
-        files_devel = (
-            "%package        devel\n"
-            "Summary:        Development files for %{name}\n"
-            "Requires:       %{name}%{?_isa} = %{version}-%{release}\n"
-            "\n"
-            "%description    devel\n"
-            f"Headers and pkg-config files for building applications that use\n"
-            f"the {m.summary}.\n"
-            "\n"
-            "%files devel\n"
-            f"%{{_includedir}}/{m.pkg_name}/\n"
-            f"%{{_libdir}}/lib{m.pkg_name}.so\n"
-            "%{_libdir}/pkgconfig/*.pc"
+        config_files = "\n".join(
+            f"%config(noreplace) %{{_sysconfdir}}/{g}" for g in m.config_globs
         )
+        files_main_parts = ["%files", "%license LICENSE"]
+        if m.doc_files:
+            files_main_parts.append("%doc " + " ".join(m.doc_files))
+        files_main_parts.append(f"%{{_libdir}}/lib{m.pkg_name}.so.*")
+        if extra_libs:
+            files_main_parts.append(extra_libs)
+        if config_files:
+            files_main_parts.append(config_files)
+        files_main = "\n".join(files_main_parts)
+        # For non-library packages (no .so), use a broader glob
+        if not m.has_libs:
+            files_main = (
+                "%files\n"
+                "%license LICENSE\n"
+                "%doc README.md\n"
+                "%{_bindir}/*\n"
+                "%{_datadir}/%{name}/"
+            )
+            files_devel = ""
+        if m.has_devel:
+            files_devel = (
+                "%package        devel\n"
+                "Summary:        Development files for %{name}\n"
+                "Requires:       %{name}%{?_isa} = %{version}-%{release}\n"
+                "\n"
+                "%description    devel\n"
+                f"Headers and pkg-config files for building applications that use\n"
+                f"the {m.summary}.\n"
+                "\n"
+                "%files devel\n"
+                f"%{{_includedir}}/{m.pkg_name}/\n"
+                f"%{{_libdir}}/lib{m.pkg_name}.so\n"
+                "%{_libdir}/pkgconfig/*.pc"
+            )
+        else:
+            files_devel = ""
 
     # %changelog
     maintainer_name  = re.sub(r"\s*<.*>", "", m.maintainer).strip()
@@ -526,8 +577,9 @@ def generate_spec(m: RpmManifest) -> str:
 
 def generate_sources(m: RpmManifest) -> str:
     """
-    dist-git sources file — exact format used by qualcomm-linux/pkg-rpm-audioreach-pal.
+    dist-git sources file in the standard Fedora/CentOS dist-git format.
     SHA512 (filename) = hexdigest
+    Replace the placeholder with: sha512sum --tag <tarball> > sources
     """
     return (
         f"SHA512 ({m.tarball_name}) = "
@@ -536,7 +588,7 @@ def generate_sources(m: RpmManifest) -> str:
 
 
 def generate_readme(m: RpmManifest) -> str:
-    """README.md modelled on the real pkg-rpm-audioreach-pal README."""
+    """Generic README.md for any pkg-rpm-<name> repository."""
     vcs_link = f"[{m.pkg_name}]({m.vcs_url})" if m.vcs_url else m.pkg_name
     return textwrap.dedent(f"""\
         <!--
@@ -601,7 +653,7 @@ def generate_readme(m: RpmManifest) -> str:
 
 
 def generate_build_on_pr(m: RpmManifest) -> str:
-    """Exact copy of the real build-on-pr.yml from qualcomm-linux/pkg-rpm-audioreach-pal."""
+    """build-on-pr.yml — delegates to qualcomm-linux/qcom-rpm-utils reusable workflow."""
     return textwrap.dedent(f"""\
         # Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
         # SPDX-License-Identifier: BSD-3-Clause
@@ -647,7 +699,7 @@ def generate_build_on_pr(m: RpmManifest) -> str:
 
 
 def generate_pkg_release(m: RpmManifest) -> str:
-    """Exact copy of the real pkg-release.yml from qualcomm-linux/pkg-rpm-audioreach-pal."""
+    """pkg-release.yml — delegates to qualcomm-linux/qcom-rpm-utils reusable workflow."""
     return textwrap.dedent(f"""\
         # Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
         # SPDX-License-Identifier: BSD-3-Clause
@@ -969,18 +1021,54 @@ def _yocto_dep_to_rpm(dep: str) -> Optional[str]:
     if dep in skip or dep.startswith("virtual/"):
         return None
     mapping = {
+        # glib / GObject
         "libglib-2.0": "glib2-devel",
         "glib-2.0": "glib2-devel",
+        "gobject-introspection": "gobject-introspection-devel",
+        # compression / crypto
         "zlib": "zlib-devel",
         "openssl": "openssl-devel",
+        "libssl": "openssl-devel",
+        "bzip2": "bzip2-devel",
+        "xz": "xz-devel",
+        "lz4": "lz4-devel",
+        "zstd": "zstd-devel",
+        # USB / serial
         "libusb1": "libusb1-devel",
+        "libusb": "libusb-devel",
+        # XML / JSON
         "libxml2": "libxml2-devel",
+        "expat": "expat-devel",
+        "json-c": "json-c-devel",
+        "jansson": "jansson-devel",
+        # audio
         "alsa-lib": "alsa-lib-devel",
         "pulseaudio": "pulseaudio-libs-devel",
+        "pipewire": "pipewire-devel",
+        "tinyalsa": "pkgconfig(tinyalsa)",
+        "tinycompress": "tinycompress-devel",
+        # IPC / system
         "dbus": "dbus-devel",
         "systemd": "systemd-devel",
         "udev": "libudev-devel",
+        "libcap": "libcap-devel",
+        "libseccomp": "libseccomp-devel",
+        # networking
+        "curl": "libcurl-devel",
+        "libcurl": "libcurl-devel",
+        # graphics / display
+        "libdrm": "libdrm-devel",
+        "mesa": "mesa-libGL-devel",
+        "wayland": "wayland-devel",
+        # Qualcomm platform
+        "agm": "pkgconfig(agm)",
+        "spf": "pkgconfig(spf)",
+        "kvh2xml": "pkgconfig(kvh2xml)",
+        "audioroute": "pkgconfig(audioroute)",
+        "ar-osal": "pkgconfig(ar_osal)",
+        "gsl": "pkgconfig(gsl)",
     }
+    # pkgconfig() form preferred for libraries that ship .pc files
     return mapping.get(dep, f"{dep}-devel")
 
 

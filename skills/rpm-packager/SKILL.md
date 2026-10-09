@@ -18,8 +18,9 @@ metadata:
 # rpm-packager Skill
 
 Generates a complete `pkg-rpm-<name>/` repository skeleton for CentOS Stream 10
-(aarch64) builds, modelled exactly on
-[qualcomm-linux/pkg-rpm-audioreach-pal](https://github.com/qualcomm-linux/pkg-rpm-audioreach-pal).
+(aarch64) builds, following the `qualcomm-linux/qcom-rpm-utils` dist-git CI pipeline.
+Works for **any package** — AudioReach, kernel modules, prebuilt binaries, or any
+upstream project.
 
 ---
 
@@ -27,11 +28,11 @@ Generates a complete `pkg-rpm-<name>/` repository skeleton for CentOS Stream 10
 
 | Mode | Example trigger |
 |---|---|
-| Yocto recipe file | `rpm package audioreach-pal_1.0.2.bb` |
-| Remote git URL | `rpm package https://github.com/AudioReach/audioreach-pal` |
-| Remote tarball URL | `rpm package https://example.com/audioreach-pal-1.0.2.tar.gz` |
-| Local source tree | `rpm package ./audioreach-pal/` |
-| Local tarball | `rpm package ./audioreach-pal-1.0.2.tar.gz` |
+| Yocto recipe file | `rpm package libfoo_1.2.0.bb` |
+| Remote git URL | `rpm package https://github.com/org/mypackage` |
+| Remote tarball URL | `rpm package https://example.com/mypackage-1.2.0.tar.gz` |
+| Local source tree | `rpm package ./mypackage/` |
+| Local tarball | `rpm package ./mypackage-1.2.0.tar.gz` |
 
 ---
 
@@ -134,14 +135,14 @@ The generated spec follows the exact structure of the real
 %global debug_package %{nil}
 %global _lto_cflags %{nil}
 
-Name:           audioreach-pal
-Version:        1.0.2
+Name:           mypackage
+Version:        1.2.0
 Release:        1%{?dist}
-Summary:        AudioReach Platform Adaptation Layer library
+Summary:        One-line summary of mypackage
 ExclusiveArch:  aarch64
 
-License:        BSD-3-Clause-Clear
-URL:            https://github.com/AudioReach/audioreach-pal
+License:        BSD-3-Clause
+URL:            https://github.com/org/mypackage
 Source0:        %{url}/archive/refs/tags/v%{version}.tar.gz#/%{name}-%{version}.tar.gz
 
 BuildRequires:  autoconf
@@ -151,27 +152,24 @@ BuildRequires:  make
 BuildRequires:  gcc
 BuildRequires:  gcc-c++
 BuildRequires:  pkgconfig
-BuildRequires:  pkgconfig(glib-2.0)
-BuildRequires:  pkgconfig(agm)
-...
+# <extra BuildRequires auto-populated from recipe DEPENDS or --build-requires>
 
 %description
-...
+Full description of mypackage.
 
 %package        devel
 Summary:        Development files for %{name}
 Requires:       %{name}%{?_isa} = %{version}-%{release}
 
 %description    devel
-...
+Headers and pkg-config files for building against %{name}.
 
 %prep
 %autosetup -n %{name}-%{version}
 
 %build
 autoreconf -fi
-%configure \
-    --with-glib
+%configure
 
 %make_build
 
@@ -181,20 +179,17 @@ find %{buildroot} -name '*.la' -delete
 
 %files
 %license LICENSE
-%{_libdir}/libpal.so.*
-%{_libdir}/libstream_*.so
-...
+%{_libdir}/libmypackage.so.*
 
 %files devel
-%{_includedir}/pal/
-%{_libdir}/libpal.so
+%{_includedir}/mypackage/
+%{_libdir}/libmypackage.so
 %{_libdir}/pkgconfig/*.pc
-...
 
 %changelog
-* Fri Oct 09 2026 Saurav Kumar <sauravk@qti.qualcomm.com> - 1.0.2-1
-- Initial RPM packaging of audioreach-pal version 1.0.2.
-```
+* Fri Oct 09 2026 Saurav Kumar <sauravk@qti.qualcomm.com> - 1.2.0-1
+- Initial RPM packaging of mypackage version 1.2.0.
+``````
 
 ---
 
@@ -322,36 +317,45 @@ After pushing to GitHub, configure:
 ## Example Invocations
 
 ```bash
-# AudioReach PAL (auto-detects v1.0.2 via GitHub API)
+# Any package from a git URL (version auto-detected via GitHub API)
 python3 scripts/rpm_packager.py \
-    --url https://github.com/AudioReach/audioreach-pal \
-    --output /tmp/pkg-rpm-audioreach-pal
-
-# AudioReach PipeWire plugin
-python3 scripts/rpm_packager.py \
-    --url https://github.com/AudioReach/audioreach-pipewire-plugin \
-    --output /tmp/pkg-rpm-audioreach-pipewire-plugin
-
-# AudioReach audio-utils from tarball URL
-python3 scripts/rpm_packager.py \
-    --url https://github.com/AudioReach/audioreach-audio-utils/archive/refs/tags/v1.0.0.tar.gz \
-    --output /tmp/pkg-rpm-audioreach-audio-utils
+    --url https://github.com/org/mypackage \
+    --output /tmp/pkg-rpm-mypackage
 
 # From a Yocto recipe
 python3 scripts/rpm_packager.py \
-    --recipe meta-qcom/recipes-audioreach/audioreach-pal/audioreach-pal_1.0.2.bb \
-    --output /tmp/pkg-rpm-audioreach-pal
+    --recipe meta-layer/recipes-foo/mypackage/mypackage_1.2.0.bb \
+    --output /tmp/pkg-rpm-mypackage
 
-# Kernel module from local tree
+# From a local source tree
 python3 scripts/rpm_packager.py \
-    --path ./audioreach-kernel \
-    --kmod \
-    --output /tmp/pkg-rpm-audioreach-kernel
+    --path ./mypackage \
+    --output /tmp/pkg-rpm-mypackage
 
-# Dry-run preview
+# Kernel module
+python3 scripts/rpm_packager.py \
+    --path ./my-kernel-driver \
+    --kmod \
+    --output /tmp/pkg-rpm-my-kernel-driver
+
+# Prebuilt tarball
+python3 scripts/rpm_packager.py \
+    --url https://example.com/mypackage-1.2.0_aarch64.tar.gz \
+    --output /tmp/pkg-rpm-mypackage
+
+# Dry-run preview (no files written)
+python3 scripts/rpm_packager.py \
+    --url https://github.com/org/mypackage \
+    --dry-run --verbose
+
+# AudioReach examples
 python3 scripts/rpm_packager.py \
     --url https://github.com/AudioReach/audioreach-pal \
-    --dry-run --verbose
+    --output /tmp/pkg-rpm-audioreach-pal
+
+python3 scripts/rpm_packager.py \
+    --url https://github.com/AudioReach/audioreach-pipewire-plugin \
+    --output /tmp/pkg-rpm-audioreach-pipewire-plugin
 ```
 
 ---
