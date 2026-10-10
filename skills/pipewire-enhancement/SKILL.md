@@ -2,13 +2,13 @@
 name: pipewire-enhancement
 description: >
   PipeWire Enhancement Engineer for Qualcomm QLI, AudioReach, PAL, ADSP/DSP,
-  WirePlumber, and Yocto-based audio stacks. Analyses enhancement requests and
-  produces structured 10-section implementation proposals covering architecture
-  impact, implementation plan, test coverage, documentation tasks, and acceptance
-  criteria. Use when asked to: analyse a PipeWire enhancement, investigate an
-  audio issue, propose a feature for QLI/AudioReach/PAL, improve audio quality,
-  fix a glitch, add SSMD/Fluence/compressed-offload support, improve WirePlumber
-  policy, update audio documentation, or plan packaging/deployment changes.
+  WirePlumber, and Yocto-based audio stacks. Accepts a natural-language description
+  of an issue and a goal, then produces a complete structured 10-section
+  implementation proposal — no template-filling required.
+  Use when asked to: analyse a PipeWire enhancement, investigate an audio issue,
+  propose a feature for QLI/AudioReach/PAL, improve audio quality, fix a glitch,
+  add SSMD/Fluence/compressed-offload support, improve WirePlumber policy, update
+  audio documentation, or plan packaging/deployment changes.
   Triggers on: pipewire, wireplumber, pw-record, pw-play, spa.alsa, audioreach,
   pipewire-pal, QLI, SSMD, Fluence, Config 1, Config 2, audio glitch, audio
   routing, audio enhancement, IQ9075, QCS6490, SA8775P, RB3.
@@ -22,75 +22,94 @@ WirePlumber policy, and Yocto-based embedded Linux audio stacks.
 
 ---
 
-## Workflow
+## How to Use
 
-### Step 1 — Run the input scaffolder (optional but recommended)
+### Option 1 — Conversational (recommended)
+
+Just run the script and answer two questions:
 
 ```bash
-python3 scripts/analyze_enhancement.py --interactive
+python3 scripts/analyze_enhancement.py
 ```
 
-Or pre-fill known fields:
+```
+▶ What issue are you seeing?
+  Audio glitch and tick at playback start on IQ9075 QLI 2.x
+
+▶ What do you want to build / achieve?
+  Eliminate the tick without regressing other audio paths
+```
+
+→ Full 10-section proposal printed immediately.
+
+### Option 2 — One-liner
 
 ```bash
 python3 scripts/analyze_enhancement.py \
-    --title "Audio glitch at playback start" \
-    --platform IQ9075 \
-    --stack "QLI 2.x" \
-    --type "audio-quality,debug"
+    --issue "Audio glitch at playback start on IQ9075 QLI 2.x with pw-play" \
+    --goal  "Eliminate the tick without regressing other audio paths"
 ```
 
-The script validates required fields, maps the request to affected components,
-and prints a pre-filled input template ready to paste into the chat.
-
-### Step 2 — Classify the request
-
-| # | Type |
-|---|------|
-| 1 | New PipeWire feature |
-| 2 | Existing feature enhancement |
-| 3 | Performance improvement |
-| 4 | Startup / enumeration improvement |
-| 5 | Audio quality improvement |
-| 6 | Routing or policy enhancement |
-| 7 | Configuration enhancement |
-| 8 | PAL / AudioReach integration enhancement |
-| 9 | API or ABI enhancement |
-| 10 | Debugging / root-cause investigation |
-| 11 | Documentation enhancement |
-| 12 | Test or validation enhancement |
-| 13 | Packaging or deployment enhancement |
-
-### Step 3 — Extract required input
-
-Ask the user for any missing fields:
+### Option 3 — From a file
 
 ```
-Enhancement Title      :
-User-visible Problem   :
-Expected Behaviour     :
-Current Behaviour      :
-Target Platform/Product:  (IQ9075 / QCS6490 / SA8775P / RB3-Gen2 / ...)
-Software Image / Build :
-PipeWire Version       :
-WirePlumber Version    :
-Kernel Version         :
-Firmware Version       :
-Audio Path             :  (playback / capture / loopback / BT / USB / ...)
-Reproduction Steps     :
-Logs / Diagnostic Data :
-Functional Requirements:
-Performance Requirements:
-Backward-Compat. Req.  :
-Security Considerations:
-Acceptance Criteria    :
+# my_issue.txt
+Audio glitch at playback start on IQ9075 QLI 2.x with pw-play
+Eliminate the tick without regressing other audio paths
 ```
 
-### Step 4 — Produce the proposal
+```bash
+python3 scripts/analyze_enhancement.py --from-file my_issue.txt
+```
 
-Output all 10 sections (see *Output Format* below). Never invent source-file
-names, APIs, commits, or root causes. Mark uncertain conclusions as
-*(hypothesis)*. List gaps instead of guessing.
+### Save to file
+
+```bash
+python3 scripts/analyze_enhancement.py \
+    --issue "..." --goal "..." \
+    --no-color > proposal.md
+```
+
+---
+
+## What the Proposal Contains
+
+Every proposal produced from your input covers all 10 sections:
+
+| # | Section | What it gives you |
+|---|---|---|
+| 1 | **Enhancement Summary** | Plain-English summary of issue + goal |
+| 2 | **Classification** | Which of 13 enhancement types apply |
+| 3 | **Affected Components** | Component table with change type |
+| 4 | **Gap Analysis** | Missing info you need to provide |
+| 5 | **Architecture & Design Notes** | Root-cause hypotheses + proposed approach |
+| 6 | **Implementation Plan** | Step-by-step task table with effort (S/M/L) |
+| 7 | **Test & Validation Plan** | Exact test commands + diagnostic hints |
+| 8 | **Documentation Tasks** | Pages/sections to create or update |
+| 9 | **Open Questions & Risks** | Risks with mitigations |
+| 10 | **Acceptance Criteria** | Measurable completion conditions |
+
+---
+
+## Enhancement Types Detected Automatically
+
+The script detects the type from your issue + goal text — no manual selection needed.
+
+| # | Type | Trigger keywords |
+|---|---|---|
+| 1 | New PipeWire feature | "new feature", "add support", "implement" |
+| 2 | Existing feature enhancement | "improve", "enhance", "better" |
+| 3 | Performance improvement | "latency", "cpu", "power", "offload" |
+| 4 | Startup / enumeration improvement | "startup", "boot", "missing device" |
+| 5 | Audio quality improvement | "glitch", "tick", "pop", "noise", "quality" |
+| 6 | Routing or policy enhancement | "routing", "policy", "sink", "source", "ssmd" |
+| 7 | Configuration enhancement | "config 1", "config 2", "topology", "lua" |
+| 8 | PAL / AudioReach integration | "pal", "audioreach", "adsp", "agm" |
+| 9 | API or ABI enhancement | "api", "abi", "interface", "protocol" |
+| 10 | Debugging / root-cause investigation | "debug", "rca", "investigate" |
+| 11 | Documentation enhancement | "document", "doc", "guide" |
+| 12 | Test or validation enhancement | "test", "validate", "ci" |
+| 13 | Packaging or deployment enhancement | "package", "yocto", "debian", "rpm" |
 
 ---
 
@@ -109,57 +128,9 @@ names, APIs, commits, or root causes. Mark uncertain conclusions as
 | **Yocto** | pipewire/wireplumber recipes, PACKAGECONFIG, systemd ordering, audio group, D-Bus |
 | **Debian/RPM** | debian/ metadata, Debusine APT pipeline, RPM spec, build scripts |
 
-For detailed component→source-file mapping and QLI 1.x vs 2.x feature delta,
-see `references/component_map.md`.
-
-For platform-specific constraints and known issue patterns,
-see `references/platform_matrix.md`.
-
 ---
 
-## Output Format
-
-Produce all 10 sections for every request:
-
-### 1. Enhancement Summary
-One-paragraph plain-English summary of what is being asked and why.
-
-### 2. Classification
-List applicable types from the table above (numbers + names).
-
-### 3. Affected Components
-Table: Component | Sub-component | Change Type (New / Modify / Config / Test / Doc)
-
-### 4. Gap Analysis
-Bullet list of missing information needed before implementation can begin.
-
-### 5. Architecture & Design Notes
-Proposed changes, data-flow impact, API additions/modifications,
-backward-compatibility considerations. Label hypotheses explicitly.
-
-### 6. Implementation Plan
-
-| Step | Area | Task | Owner hint | Effort |
-|---|---|---|---|---|
-| 1 | ... | ... | ... | S/M/L |
-
-### 7. Test & Validation Plan
-Unit tests, integration tests, platform tests, regression checks,
-performance benchmarks. Include specific `pw-record`/`pw-play`/`arecord`
-command lines where applicable.
-
-### 8. Documentation Tasks
-List pages, sections, or guides to create or update.
-
-### 9. Open Questions & Risks
-Unanswered questions, hypotheses, known risks with suggested mitigations.
-
-### 10. Acceptance Criteria
-Bullet list of measurable conditions that confirm the enhancement is complete.
-
----
-
-## Style Rules
+## Style Rules (when generating proposals in chat)
 
 - Tables wherever structure helps clarity.
 - Speculation labelled: *(hypothesis)* or *(to be confirmed)*.

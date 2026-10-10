@@ -366,52 +366,82 @@ Follows the exact real-world reference from `qualcomm-linux/pkg-rpm-audioreach-p
 ### What it does
 
 Acts as a **PipeWire Enhancement Engineer** for Qualcomm QLI, AudioReach, PAL,
-ADSP/DSP, WirePlumber, and Yocto-based audio stacks. Given any enhancement
-request — feature ask, quality complaint, debug investigation, or documentation
-gap — it produces a fully structured 10-section implementation proposal.
+ADSP/DSP, WirePlumber, and Yocto-based audio stacks.
+
+**You describe your issue and what you want to build — it produces the full proposal.**
+No template-filling, no manual classification. Just describe the problem in plain
+English and get a complete 10-section implementation proposal back.
 
 ### Usage
 
+**Conversational (recommended) — just run and answer two questions:**
+
 ```bash
-# Scaffold a request and map it to components
-python3 skills/pipewire-enhancement/scripts/analyze_enhancement.py \
-    --title "Audio glitch at playback start" \
-    --platform IQ9075 \
-    --type audio-quality,debug
-
-# Interactive mode (prompts for all fields)
-python3 skills/pipewire-enhancement/scripts/analyze_enhancement.py --interactive
-
-# List all enhancement types
-python3 skills/pipewire-enhancement/scripts/analyze_enhancement.py --list-types
-
-# List all known platforms
-python3 skills/pipewire-enhancement/scripts/analyze_enhancement.py --list-platforms
+python3 skills/pipewire-enhancement/scripts/analyze_enhancement.py
 ```
 
-### Enhancement types supported
+```
+▶ What issue are you seeing?
+  Audio glitch and tick at playback start on IQ9075 QLI 2.x
 
-| # | Type | # | Type |
-|---|---|---|---|
-| 1 | New PipeWire feature | 8 | PAL / AudioReach integration |
-| 2 | Existing feature enhancement | 9 | API or ABI enhancement |
-| 3 | Performance improvement | 10 | Debugging / root-cause investigation |
-| 4 | Startup / enumeration improvement | 11 | Documentation enhancement |
-| 5 | Audio quality improvement | 12 | Test or validation enhancement |
-| 6 | Routing or policy enhancement | 13 | Packaging or deployment enhancement |
-| 7 | Configuration enhancement | | |
+▶ What do you want to build / achieve?
+  Eliminate the tick without regressing other audio paths
+```
 
-### Output structure
+**One-liner:**
 
-Every proposal contains: Enhancement Summary · Classification · Affected Components ·
-Gap Analysis · Architecture & Design Notes · Implementation Plan · Test & Validation Plan ·
-Documentation Tasks · Open Questions & Risks · Acceptance Criteria
+```bash
+python3 skills/pipewire-enhancement/scripts/analyze_enhancement.py \
+    --issue "Audio glitch at playback start on IQ9075 QLI 2.x with pw-play" \
+    --goal  "Eliminate the tick without regressing other audio paths"
+```
+
+**From a file** (`my_issue.txt` — first line = issue, second = goal):
+
+```bash
+python3 skills/pipewire-enhancement/scripts/analyze_enhancement.py \
+    --from-file my_issue.txt
+```
+
+**Save proposal to markdown:**
+
+```bash
+python3 skills/pipewire-enhancement/scripts/analyze_enhancement.py \
+    --issue "..." --goal "..." --no-color > proposal.md
+```
+
+### What you get back
+
+Every proposal covers all 10 sections — auto-generated from your input:
+
+| # | Section | What it gives you |
+|---|---|---|
+| 1 | Enhancement Summary | Plain-English summary of issue + goal |
+| 2 | Classification | Which of 13 enhancement types apply |
+| 3 | Affected Components | Component table with change type |
+| 4 | Gap Analysis | Missing info you need to provide |
+| 5 | Architecture & Design Notes | Root-cause hypotheses + proposed approach |
+| 6 | Implementation Plan | Step-by-step tasks with effort (S/M/L) |
+| 7 | Test & Validation Plan | Exact test commands + diagnostic hints |
+| 8 | Documentation Tasks | Pages/sections to create or update |
+| 9 | Open Questions & Risks | Risks with mitigations |
+| 10 | Acceptance Criteria | Measurable completion conditions |
+
+### More options
+
+```bash
+# List all known platforms
+python3 skills/pipewire-enhancement/scripts/analyze_enhancement.py --list-platforms
+
+# List all 13 enhancement types
+python3 skills/pipewire-enhancement/scripts/analyze_enhancement.py --list-types
+```
 
 ### References
 
 - `references/component_map.md` — source-file mapping, QLI 1.x vs 2.x delta, AudioReach graph
 - `references/platform_matrix.md` — per-platform capabilities, known issue patterns, diagnostic commands
-- `references/examples.md` — three full worked examples (audio glitch, SSMD docs, Config 1 vs 2)
+- `references/examples.md` — three full worked examples
 
 
 ## Requirements
