@@ -14,6 +14,7 @@ for Qualcomm platform and AudioReach development.
 | [debian-packager](skills/debian-packager/SKILL.md) | End-to-end Debian packaging skeleton generator for QCOM/AudioReach components — supports Yocto recipes, remote URLs, and local source trees |
 | [rpm-packager](skills/rpm-packager/SKILL.md) | End-to-end RPM packaging skeleton generator for CentOS Stream 10 (aarch64) — generates spec files, dist-git sources, and GitHub Actions CI/release workflows modelled on qualcomm-linux/pkg-rpm-audioreach-pal |
 | [orbit-cr-report](skills/orbit-cr-report/SKILL.md) | Fetch a saved Orbit query, parse all CRs, group by Found on Product (target), sort by age, and display Software Image Status (Analysis, Fixed, Build, etc.) with colour coding |
+| [pipewire-enhancement](skills/pipewire-enhancement/SKILL.md) | PipeWire Enhancement Engineer for Qualcomm QLI/AudioReach/PAL/ADSP — classifies enhancement requests across 13 types, maps to affected components, and produces structured 10-section implementation proposals with architecture notes, implementation plan, test plan, and acceptance criteria |
 
 ---
 
@@ -356,6 +357,61 @@ Follows the exact real-world reference from `qualcomm-linux/pkg-rpm-audioreach-p
 - Split `%package devel` with headers + pkgconfig
 - `find %{buildroot} -name '*.la' -delete` in `%install`
 - `publish-target: staging | prod` choice in release workflow
+
+
+---
+
+## pipewire-enhancement Skill
+
+### What it does
+
+Acts as a **PipeWire Enhancement Engineer** for Qualcomm QLI, AudioReach, PAL,
+ADSP/DSP, WirePlumber, and Yocto-based audio stacks. Given any enhancement
+request — feature ask, quality complaint, debug investigation, or documentation
+gap — it produces a fully structured 10-section implementation proposal.
+
+### Usage
+
+```bash
+# Scaffold a request and map it to components
+python3 skills/pipewire-enhancement/scripts/analyze_enhancement.py \
+    --title "Audio glitch at playback start" \
+    --platform IQ9075 \
+    --type audio-quality,debug
+
+# Interactive mode (prompts for all fields)
+python3 skills/pipewire-enhancement/scripts/analyze_enhancement.py --interactive
+
+# List all enhancement types
+python3 skills/pipewire-enhancement/scripts/analyze_enhancement.py --list-types
+
+# List all known platforms
+python3 skills/pipewire-enhancement/scripts/analyze_enhancement.py --list-platforms
+```
+
+### Enhancement types supported
+
+| # | Type | # | Type |
+|---|---|---|---|
+| 1 | New PipeWire feature | 8 | PAL / AudioReach integration |
+| 2 | Existing feature enhancement | 9 | API or ABI enhancement |
+| 3 | Performance improvement | 10 | Debugging / root-cause investigation |
+| 4 | Startup / enumeration improvement | 11 | Documentation enhancement |
+| 5 | Audio quality improvement | 12 | Test or validation enhancement |
+| 6 | Routing or policy enhancement | 13 | Packaging or deployment enhancement |
+| 7 | Configuration enhancement | | |
+
+### Output structure
+
+Every proposal contains: Enhancement Summary · Classification · Affected Components ·
+Gap Analysis · Architecture & Design Notes · Implementation Plan · Test & Validation Plan ·
+Documentation Tasks · Open Questions & Risks · Acceptance Criteria
+
+### References
+
+- `references/component_map.md` — source-file mapping, QLI 1.x vs 2.x delta, AudioReach graph
+- `references/platform_matrix.md` — per-platform capabilities, known issue patterns, diagnostic commands
+- `references/examples.md` — three full worked examples (audio glitch, SSMD docs, Config 1 vs 2)
 
 
 ## Requirements

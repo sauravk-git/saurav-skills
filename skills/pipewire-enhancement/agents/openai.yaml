@@ -1,0 +1,3 @@
+display_name: PipeWire Enhancement
+short_description: Analyse PipeWire/AudioReach enhancements for Qualcomm QLI
+default_prompt: Analyse this PipeWire enhancement request and produce a structured implementation proposal
