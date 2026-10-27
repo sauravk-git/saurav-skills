@@ -1,323 +1,229 @@
 ---
 name: glymur-kernel-deb
 description: >
-  Build any Linux kernel as Debian (.deb) packages and install them on a Glymur
-  (Debian-based) target device. Covers installing host build tools, capturing the
-  running kernel config, cross-compiling with bindeb-pkg, transferring packages via
-  SCP or ADB, installing with dpkg, and updating the EFI boot entry to include the
-  Glymur CRD device tree.
+  Build a Linux kernel as Debian .deb packages and install them on a Glymur
+  (Debian-based) target device. Accepts all meaningful inputs explicitly — patch
+  file or directory, kernel branch, target connection (ADB or SSH), config source,
+  DTB filename, and more — with smart auto-detection as fallback. Runs the full
+  pipeline end-to-end: host-tool check, config pull, kernel clone, patch apply,
+  cross-compile, package transfer, dpkg install, EFI boot-entry update, reboot.
 source: https://qualcomm-confluence.atlassian.net/wiki/spaces/LinuxAudio/pages/3610140392/Build+and+Install+Kernel+.deb+Glymur
 license: Proprietary. Internal Qualcomm use only.
+metadata:
+  author: Saurav Kumar <sauravk@qti.qualcomm.com>
+  version: "2.0"
+  tags: [kernel, debian, glymur, arm64, cross-compile, deb, efi]
 ---
 
-# Build and Install Kernel .deb — Glymur
+# glymur-kernel-deb Skill
 
-## Overview
+End-to-end kernel `.deb` builder and installer for Glymur targets.
 
-This skill guides you through building any Linux kernel as Debian (`.deb`) packages
-and installing them on a **Glymur** target device (Debian-based).
-
-The workflow is generic — no step is tied to a specific kernel version, machine ID,
-or branch name. Substitute the placeholders (shown as `<LIKE_THIS>`) with the values
-that apply to your environment.
-
-**Prerequisites:**
-- Shell access to both host and target (SSH and/or ADB)
-- An x86-64 Linux host with `sudo` access for installing build tools
-- Permissions to install packages and edit EFI boot entries on the target
+The agent collects all meaningful inputs from the user, then runs
+`scripts/kernel_deb_builder.py` which handles the full pipeline automatically.
 
 ---
 
-## Step 0 — Install host build tools
+## Inputs the agent must collect
 
-Install the cross-compilation toolchain and kernel packaging dependencies on the host.
+Gather these before invoking the script.  Items marked **auto** have smart
+defaults — only ask if the user hasn't already provided them or if auto-detection
+is likely to fail.
+
+| # | Input | Flag | Default / auto-detect | When to ask explicitly |
+|---|---|---|---|---|
+| 1 | **Change / patch** | `--patch PATH` | — | Always — what are you building? |
+| 2 | **Kernel branch** | `--branch BRANCH` | Auto-detected from target `uname -r` | When user specifies, or auto-detect fails |
+| 3 | **Target transport** | `--transport adb\|ssh` | ADB if device connected, else SSH | When user mentions SSH or no ADB device |
+| 4 | **Target IP** | `--target-ip IP` | — | Required when transport is SSH |
+| 5 | **Config source** | `--config-from target\|file\|defconfig` | `target` (pull from running device) | When user has a local config or wants defconfig |
+| 6 | **DTB filename** | `--dtb FILENAME` | `glymur-crd.dtb` | When user mentions a different board variant |
+| 7 | **Install on target?** | `--install` / `--build-only` | Ask user | Always clarify intent |
+
+Additional inputs to collect if the user mentions them:
+
+| Input | Flag | Notes |
+|---|---|---|
+| Local config file | `--config-file PATH` | Required when `--config-from=file` |
+| Local kernel tree | `--kernel-src PATH` | Use instead of `--patch` when user has a full tree |
+| Cherry-pick commits | `--cherry-pick SHA [SHA …]` | Alternative to patch files |
+| Custom version string | `--localversion STRING` | e.g. `-glymur-myfix` |
+| SSH username | `--target-user USER` | Default: `debian` |
+| Skip reboot | `--no-reboot` | When user wants to reboot manually |
+| Build only | `--build-only` | No target needed; requires `--branch` and `--config-from file` |
+| Install only | `--install-only` | Re-install from a previous build in `--workdir` |
+
+---
+
+## How to invoke the script
+
+### Recommended: interactive mode (agent runs this when inputs are unclear)
 
 ```bash
-sudo apt-get install -y \
-    gcc-aarch64-linux-gnu \
-    make \
-    dpkg-dev \
-    libssl-dev \
-    libelf-dev \
-    bc \
-    bison \
-    flex \
-    git
+python3 scripts/kernel_deb_builder.py --interactive
 ```
 
----
-
-## Step-by-Step Instructions
-
-### 1. Save the current kernel config on the target
-
-Capture the running kernel configuration so the new build starts from a known-good
-baseline.
-
-```bash
-# On the target
-zcat /proc/config.gz > kernel.config
-```
+The script will prompt for every input with sensible defaults.
 
 ---
 
-### 2. Pull the config to the host
+### Direct invocation (agent constructs the command from collected inputs)
 
-Copy the saved configuration file from the target to the host working directory.
-Use whichever transport is available:
-
-**ADB:**
+**Most common — patch + ADB-connected target:**
 ```bash
-adb pull kernel.config ./
+python3 scripts/kernel_deb_builder.py \
+    --patch <PATCH_FILE_OR_DIR> \
+    --branch <BRANCH> \
+    --transport adb \
+    --config-from target \
+    --dtb glymur-crd.dtb \
+    --install
 ```
 
-**SCP:**
+**Patch + SSH target:**
 ```bash
-scp <USER>@<TARGET_IP>:~/kernel.config ./
+python3 scripts/kernel_deb_builder.py \
+    --patch <PATCH_FILE_OR_DIR> \
+    --branch <BRANCH> \
+    --transport ssh --target-ip <IP> --target-user debian \
+    --config-from target \
+    --dtb glymur-crd.dtb \
+    --install
 ```
 
-> `<USER>` is typically `debian` or `root` on a Glymur device.
-
----
-
-### 3. Clone the kernel source on the host
-
-Clone the desired kernel branch and enter the repository.
-
+**Local config file (no target needed for config):**
 ```bash
-git clone https://github.com/qualcomm-linux/kernel.git -b <BRANCH_NAME>
-cd kernel
+python3 scripts/kernel_deb_builder.py \
+    --patch <PATCH_FILE_OR_DIR> \
+    --branch <BRANCH> \
+    --transport adb \
+    --config-from file --config-file <PATH_TO_CONFIG> \
+    --dtb glymur-crd.dtb \
+    --install
 ```
 
-> Replace `<BRANCH_NAME>` with the branch you want to build, e.g.
-> `qcom-next-7.2-20260826` or `linux-next`. Check
-> [qualcomm-linux/kernel](https://github.com/qualcomm-linux/kernel) for available
-> branches.
-
----
-
-### 4. Apply your kernel changes
-
-Apply any required patches or source changes before building.
-
+**Local kernel tree with changes already applied:**
 ```bash
-# Apply your kernel changes/patches here, e.g.:
-# git am 0001-my-fix.patch
-# patch -p1 < my-change.patch
+python3 scripts/kernel_deb_builder.py \
+    --kernel-src <PATH_TO_KERNEL_TREE> \
+    --branch <BRANCH> \
+    --transport ssh --target-ip <IP> \
+    --config-from target \
+    --dtb glymur-crd.dtb \
+    --install
 ```
 
-> Skip this step if you are building the upstream tree unmodified.
-
----
-
-### 5. (Optional) Customise the kernel config
-
-If you need to enable or disable specific options, run menuconfig before building.
-
+**Build only — no target connected yet:**
 ```bash
-make O=out-arm64 ARCH=arm64 menuconfig
+python3 scripts/kernel_deb_builder.py \
+    --patch <PATCH_FILE_OR_DIR> \
+    --branch <BRANCH> \
+    --config-from file --config-file <PATH_TO_CONFIG> \
+    --build-only
 ```
 
----
-
-### 6. Prepare the build output directory
-
-Create the output directory and seed it with the pulled configuration.
-
+**Install previously built packages onto a new target:**
 ```bash
-mkdir -p out-arm64
-cp ../kernel.config out-arm64/.config
+python3 scripts/kernel_deb_builder.py \
+    --install-only \
+    --workdir ./kernel-build \
+    --transport ssh --target-ip <IP> \
+    --dtb glymur-crd.dtb
 ```
 
-> `kernel.config` is assumed to be one level above the kernel source directory
-> (i.e. where you ran `git clone`).
-
----
-
-### 7. Set the ARM64 build environment
-
-Export the architecture and cross-compiler prefix used for the build.
-
+**Dry-run — see every command without executing:**
 ```bash
-export ARCH=arm64
-export CROSS_COMPILE=aarch64-linux-gnu-
+python3 scripts/kernel_deb_builder.py \
+    --patch <PATCH_FILE_OR_DIR> \
+    --branch <BRANCH> \
+    --transport adb --config-from target \
+    --dry-run --verbose
 ```
 
 ---
 
-### 8. Update the kernel config
+## What the script does automatically
 
-Refresh the configuration so any new Kconfig symbols introduced since the config was
-captured get their default values.
+The user never needs to know about these internals:
 
-```bash
-make O=out-arm64 olddefconfig
+| Phase | What happens |
+|---|---|
+| **Host tools** | Checks for `gcc-aarch64-linux-gnu`, `make`, `dpkg-dev`, `bc`, `bison`, `flex`, `git`, `libssl-dev`, `libelf-dev`. Installs automatically with `--auto-install-tools`. |
+| **Transport check** | Verifies ADB device state or SSH reachability before proceeding. |
+| **Config pull** | Runs `zcat /proc/config.gz` on target, pulls file to host. Caches it; re-pull with `--force-config`. |
+| **Branch detection** | Reads `uname -r` from target, matches against `qualcomm-linux/kernel` branches. Falls back to latest `qcom-next`. |
+| **Clone** | Shallow-clones the kernel repo (`--depth 1` for speed). Reuses existing clone. `--fetch-latest` to reset to remote. |
+| **Patch apply** | `git am --3way` for single file or sorted directory of `.patch` files. |
+| **Configure** | Copies pulled config → `out-arm64/.config`, runs `olddefconfig`. Writes `localversion` file if `--localversion` set. |
+| **Build** | `make -j$(nproc) bindeb-pkg ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu-`. Packages land in parent of kernel source dir. |
+| **Transfer** | ADB push or SCP of `linux-*.deb` to `/tmp/` on target. |
+| **Install** | `sudo dpkg -i /tmp/linux-*.deb` on target. |
+| **Boot entry** | Uses `dpkg-query` to find installed kernel version, locates matching EFI loader entry, backs it up, appends `devicetree /dtb/qcom/<DTB>` if not already present. Falls back to newest entry if version match fails. |
+| **Reboot** | `sync && sudo reboot`. Skipped with `--no-reboot`. |
+
+---
+
+## All flags reference
+
+```
+Interactive:
+  --interactive, -i     Guided prompts for all inputs
+
+Change / source:
+  --patch PATH          Patch file (.patch) or directory of .patch files
+  --cherry-pick SHA…    Git commit SHA(s) to cherry-pick onto the branch
+  --kernel-src PATH     Local kernel tree with changes already applied
+
+Target:
+  --transport adb|ssh   Connection transport (default: auto-detect)
+  --target-ip IP        Target IP address (required for SSH)
+  --target-user USER    SSH username (default: debian)
+  --dtb FILENAME        DTB for EFI boot entry (default: glymur-crd.dtb)
+  --no-reboot           Skip automatic reboot after install
+
+Kernel config:
+  --config-from         target|file|defconfig  (default: target)
+  --config-file PATH    Local .config (required when --config-from=file)
+  --force-config        Re-pull config from target even if cached
+  --menuconfig          Open interactive menuconfig before building
+
+Kernel source:
+  --kernel-repo URL     Repo URL (default: qualcomm-linux/kernel)
+  --branch BRANCH       Branch or tag (auto-detected if omitted)
+  --clone-depth N       Git clone depth (default: 1)
+  --fetch-latest        Reset existing clone to latest remote state
+
+Build:
+  --workdir PATH        Working directory (default: ./kernel-build)
+  --jobs N              Parallel build jobs (default: nproc)
+  --localversion STR    Append to kernel version string (e.g. -glymur-myfix)
+  --auto-install-tools  Auto-install missing host tools via apt-get
+
+Modes:
+  --install             Build then install on target
+  --build-only          Build packages, do not install
+  --install-only        Skip build; install from --workdir onto target
+
+Misc:
+  --dry-run             Print every command without executing
+  --verbose             Print commands as they run
 ```
 
 ---
 
-### 9. Build Debian kernel packages
+## Troubleshooting
 
-Build Debian packages for the ARM64 kernel. The `.deb` files are written to the
-directory **one level above** the kernel source tree (i.e. the parent of where you
-ran `git clone`).
-
-```bash
-make O=out-arm64 -j$(nproc) bindeb-pkg
-```
-
----
-
-### 10. Check the generated packages on the host
-
-Verify the expected Debian package artifacts were created.
-
-```bash
-ls -lh ../linux-*.deb
-```
-
-> The packages land in `../` relative to the kernel source directory because
-> `bindeb-pkg` always writes to the parent of the source tree, regardless of the
-> `O=` output directory.
-
----
-
-### 11. Copy the packages to the target
-
-Use either SCP or ADB to transfer the generated packages.
-
-**SCP:**
-```bash
-scp ../linux-*.deb <USER>@<TARGET_IP>:/tmp/
-```
-
-**ADB:**
-```bash
-adb push ../linux-*.deb /tmp/
-```
-
----
-
-### 12. Check the copied packages on the target
-
-Confirm the package files are present in `/tmp`.
-
-```bash
-# On the target
-ls -lh /tmp/linux-*.deb
-```
-
----
-
-### 13. Install the kernel packages on the target
-
-Install the transferred Debian packages.
-
-```bash
-# On the target
-sudo dpkg -i /tmp/linux-*.deb
-```
-
----
-
-### 14. Check available boot entries
-
-Inspect the EFI loader entries to identify the one for the newly installed kernel.
-
-```bash
-# On the target
-ls -lh /boot/efi/loader/entries/
-```
-
-> Entry filenames follow the pattern `<MACHINE_ID>-<KERNEL_VERSION>.conf`.
-> Identify the entry that matches the kernel version you just installed before
-> proceeding.
-
----
-
-### 15. Back up the current boot entry
-
-Back up the EFI loader entry for the newly installed kernel before editing it.
-
-```bash
-# On the target — substitute the actual filename from Step 14
-sudo cp /boot/efi/loader/entries/<MACHINE_ID>-<KERNEL_VERSION>.conf \
-        /boot/efi/loader/entries/<MACHINE_ID>-<KERNEL_VERSION>.conf.bak
-```
-
----
-
-### 16. Add the Glymur CRD device tree
-
-Append the device tree line to the selected boot entry so the bootloader loads the
-correct DTB for the Glymur CRD hardware.
-
-```bash
-# On the target — substitute the actual filename from Step 14
-echo "devicetree /dtb/qcom/glymur-crd.dtb" | sudo tee -a \
-  /boot/efi/loader/entries/<MACHINE_ID>-<KERNEL_VERSION>.conf
-```
-
----
-
-### 17. Verify the boot entry contents
-
-Confirm the device tree line is present in the entry.
-
-```bash
-# On the target
-cat /boot/efi/loader/entries/<MACHINE_ID>-<KERNEL_VERSION>.conf
-```
-
-**Expected line:**
-```
-devicetree /dtb/qcom/glymur-crd.dtb
-```
-
----
-
-### 18. Reboot the target
-
-Restart the device to boot into the newly installed kernel.
-
-```bash
-# On the target
-sync
-sudo reboot
-```
-
----
-
-### 19. Verify the new kernel after reboot
-
-Check the running kernel version and build information.
-
-```bash
-# On the target
-uname -a
-cat /proc/version
-```
-
-**✅ Success criteria:**
-- The target reboots successfully
-- `uname -a` reports the newly built kernel version
-- The boot entry includes `devicetree /dtb/qcom/glymur-crd.dtb`
-
----
-
-## Quick Validation Checklist
-
-- [ ] Installed host build tools (Step 0)
-- [ ] Pulled `kernel.config` from the running target
-- [ ] Cloned the correct kernel branch
-- [ ] Applied patches / changes (if any)
-- [ ] Built `linux-*.deb` packages successfully
-- [ ] Copied packages to `/tmp/` on the target
-- [ ] Installed packages with `dpkg -i`
-- [ ] Identified the correct EFI boot entry filename
-- [ ] Backed up the EFI loader entry before editing
-- [ ] Added the Glymur CRD DTB line to the boot entry
-- [ ] Verified the new kernel after reboot
+| Symptom | Cause | Fix |
+|---|---|---|
+| `No ADB device found` | Device not connected or not authorised | Connect via USB, accept authorisation prompt on device, or use `--transport ssh --target-ip <IP>` |
+| `Cannot SSH to …` | Wrong IP, user, or SSH key not set up | Verify with `ssh debian@<IP>` manually; check `~/.ssh/authorized_keys` on target |
+| `Missing host tools` | Cross-compiler or build deps not installed | Add `--auto-install-tools` |
+| `No .patch files found` | Wrong path or files not named `.patch` | Check path; files must end in `.patch` |
+| `git am failed` | Patch doesn't apply cleanly to the branch | Try `--clone-depth 0` for full history, or rebase the patch |
+| `Cannot determine kernel branch` | Target unreachable or no matching branch | Pass `--branch <BRANCH>` explicitly |
+| `No EFI entry found for kernel` | Entry filename doesn't contain the version string | Script falls back to newest entry; check manually with `ls /boot/efi/loader/entries/` |
+| Build takes too long | Default `nproc` may be low on some hosts | Pass `--jobs N` to tune |
+| Want to rebuild without re-cloning | Clone already exists in `--workdir` | Script reuses it automatically; use `--fetch-latest` to update |
 
 ---
 

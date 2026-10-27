@@ -451,42 +451,119 @@ python3 skills/pipewire-enhancement/scripts/analyze_enhancement.py --list-types
 
 ### What it does
 
-Guides you through building any Linux kernel as Debian (`.deb`) packages and
-installing them on a **Glymur CRD** target device.
+End-to-end kernel `.deb` builder and installer for Glymur targets.
+Accepts all meaningful inputs explicitly — patch, branch, transport, config
+source, DTB — with smart auto-detection as fallback for each.
+Runs the full pipeline without any manual steps.
 
-| Step | What happens |
-|---|---|
-| Capture config | `zcat /proc/config.gz` pulled from the running target |
-| Cross-compile | `make bindeb-pkg` with `ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu-` |
-| Transfer | SCP or ADB push of `linux-*.deb` to `/tmp/` on the target |
-| Install | `sudo dpkg -i /tmp/linux-*.deb` |
-| Boot entry | Appends `devicetree /dtb/qcom/glymur-crd.dtb` to the EFI loader entry |
-| Verify | `uname -a` after reboot confirms the new kernel |
+### How to use
 
-### Usage
+**Tell the agent what you want to build.  It will collect the remaining inputs
+and run everything automatically.**
 
-Just describe what you want to do — the skill walks you through each step interactively:
+Example prompts:
 
 ```
-Build and install a kernel .deb on my Glymur CRD device
+Apply my-fix.patch to the Glymur kernel and install it on my ADB-connected device
+Build kernel branch qcom-next-7.2-20260826 with ./patches/ and install via SSH to 192.168.1.100
+Build only — no target connected yet, use my local config at ./my.config
 ```
 
-Or reference the step-by-step workflow directly in `skills/glymur-kernel-deb/SKILL.md`.
+The agent will ask for anything not already provided (branch, target IP, config
+source, DTB) and then invoke the script.
 
-### Prerequisites
+---
 
-- `gcc-aarch64-linux-gnu`, `make`, `dpkg-dev`, `libssl-dev` on the host
-- `adb` or `scp` access to the target
-- Permissions to install packages and edit EFI boot entries on the target
+### Direct script usage
 
+**Interactive — guided through every input:**
 ```bash
-sudo apt-get install gcc-aarch64-linux-gnu make dpkg-dev libssl-dev
+python3 skills/glymur-kernel-deb/scripts/kernel_deb_builder.py --interactive
 ```
+
+**Patch + ADB target (most common):**
+```bash
+python3 skills/glymur-kernel-deb/scripts/kernel_deb_builder.py \
+    --patch my-fix.patch \
+    --branch qcom-next-7.2-20260826 \
+    --transport adb \
+    --config-from target \
+    --dtb glymur-crd.dtb \
+    --install
+```
+
+**Patch + SSH target:**
+```bash
+python3 skills/glymur-kernel-deb/scripts/kernel_deb_builder.py \
+    --patch ./patches/ \
+    --branch qcom-next-7.2-20260826 \
+    --transport ssh --target-ip 192.168.1.100 \
+    --config-from target \
+    --dtb glymur-crd.dtb \
+    --install
+```
+
+**Local config file, build only:**
+```bash
+python3 skills/glymur-kernel-deb/scripts/kernel_deb_builder.py \
+    --patch my-fix.patch \
+    --branch qcom-next-7.2-20260826 \
+    --config-from file --config-file ./my.config \
+    --build-only
+```
+
+**Install previously built packages onto a target:**
+```bash
+python3 skills/glymur-kernel-deb/scripts/kernel_deb_builder.py \
+    --install-only \
+    --workdir ./kernel-build \
+    --transport ssh --target-ip 192.168.1.100 \
+    --dtb glymur-crd.dtb
+```
+
+**Dry-run — see every command without executing:**
+```bash
+python3 skills/glymur-kernel-deb/scripts/kernel_deb_builder.py \
+    --patch my-fix.patch --branch qcom-next-7.2-20260826 \
+    --transport adb --config-from target --dry-run --verbose
+```
+
+---
+
+### Key inputs
+
+| Input | Flag | Default |
+|---|---|---|
+| Patch file or directory | `--patch PATH` | — |
+| Kernel branch | `--branch BRANCH` | Auto-detected from target `uname -r` |
+| Transport | `--transport adb\|ssh` | Auto-detect ADB, else SSH |
+| Target IP (SSH) | `--target-ip IP` | — |
+| Config source | `--config-from target\|file\|defconfig` | `target` |
+| Local config file | `--config-file PATH` | — |
+| DTB filename | `--dtb FILENAME` | `glymur-crd.dtb` |
+| Custom version string | `--localversion STRING` | — |
+| Mode | `--install` / `--build-only` / `--install-only` | — |
+
+### What gets automated
+
+| Phase | Detail |
+|---|---|
+| Host tools | Checks and optionally installs cross-compiler, dpkg-dev, libssl-dev, etc. |
+| Config pull | `zcat /proc/config.gz` from target; cached between runs |
+| Branch detect | Matches target `uname -r` against `qualcomm-linux/kernel` branches |
+| Clone | Shallow clone; reuses existing clone automatically |
+| Patch apply | `git am --3way` for file or sorted directory |
+| Build | `make -j$(nproc) bindeb-pkg ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu-` |
+| Transfer | ADB push or SCP to `/tmp/` on target |
+| Install | `sudo dpkg -i /tmp/linux-*.deb` |
+| Boot entry | Auto-finds EFI entry, backs up, appends `devicetree /dtb/qcom/<DTB>` |
+| Reboot | `sync && sudo reboot` (skip with `--no-reboot`) |
 
 ### References
 
 - Source: [Build and Install Kernel .deb Glymur](https://qualcomm-confluence.atlassian.net/wiki/spaces/LinuxAudio/pages/3610140392/Build+and+Install+Kernel+.deb+Glymur)
 - Kernel repo: [qualcomm-linux/kernel](https://github.com/qualcomm-linux/kernel)
+
 
 ## Requirements
 
