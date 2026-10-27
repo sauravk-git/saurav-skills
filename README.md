@@ -83,18 +83,66 @@ Accepts all meaningful inputs explicitly — patch file or directory, kernel bra
 target connection (ADB or SSH), config source, DTB filename — with smart
 auto-detection as fallback for each. Runs the full pipeline without any manual steps.
 
-### How to use with QGenie
+---
 
-Tell the agent what you want to build. It collects any missing inputs and runs
-everything automatically:
+### Step 1 — Install the skill
 
+> Skip this if you already installed it.
+
+**From inside QGenie CLI:**
+```
+Install the glymur-kernel-deb skill from sauravk-git/saurav-skills
+```
+
+**Or manually:**
+```bash
+python3 ~/.config/qgenie-cli/agent/skills/.system/skill-installer/scripts/install-skill-from-github.py \
+    --repo sauravk-git/saurav-skills --path skills/glymur-kernel-deb
+
+# Then restart QGenie to pick up the new skill
+```
+
+---
+
+### Step 2 — Use it via QGenie (natural language)
+
+Open QGenie CLI and type your request in plain English.
+The agent recognises the skill, collects any missing inputs by asking follow-up
+questions, then runs `kernel_deb_builder.py` automatically.
+
+**Example prompts:**
+
+```
+Build kernel branch qcom-next-7.2-20260826 with ./patches/ and install via SSH to 192.168.1.100
+```
 ```
 Apply my-fix.patch to the Glymur kernel and install it on my ADB-connected device
-Build kernel branch qcom-next-7.2-20260826 with ./patches/ and install via SSH to 192.168.1.100
-Build only — no target connected yet, use my local config at ./my.config
+```
+```
+Build only — no target connected yet, branch qcom-next-7.2-20260826, use my local config at ./my.config
+```
+```
+Install my previously built kernel packages onto 192.168.1.100
 ```
 
-### Direct script usage
+**What the agent will ask if not already provided:**
+
+| Missing info | Example follow-up |
+|---|---|
+| No patch or source given | "What is your patch file or kernel tree path?" |
+| Branch not specified | "Which kernel branch? (auto-detecting from target…)" |
+| SSH but no IP given | "What is the target IP address?" |
+| Config source unclear | "Pull config from target, or do you have a local .config file?" |
+| DTB not mentioned | "Which DTB? (default: glymur-crd.dtb)" |
+
+Once all inputs are collected the agent runs the full pipeline and reports back
+with the installed kernel version and any warnings.
+
+---
+
+### Step 3 — Or run the script directly (without QGenie)
+
+If you prefer to bypass the agent and run the script yourself:
 
 **Interactive — guided through every input:**
 ```bash
