@@ -7,14 +7,25 @@
 Build a PipeWire Enhancement Engineering assistant for Qualcomm QLI /
 AudioReach / PAL stacks that grows in capability across four months.
 
+The skill covers both audio backend configurations:
+
+- **Config 1** — ASoC / ALSA-based PipeWire. Audio runs on the HLOS via the
+  SPA ALSA plugin (spa.alsa). Requires ASoC topology file, UCM2 files, and
+  WirePlumber ALSA monitor. Supported on all QLI platforms.
+- **Config 2** — AudioReach / PAL-based PipeWire. Audio offloaded to the ADSP
+  via pipewire-pal-plugin → PAL → AudioReach → AGM. Requires ADSP firmware,
+  remoteproc, AGM driver, PAL resourcemanager.xml, and pipewire-pal-plugin.
+  QLI 2.x only.
+
 The progression follows the natural order of engineering work:
 
-- **Month 1** — Understand the issue: classify it, identify what is known,
-  produce a structured diagnosis with config-level fix suggestions
-- **Month 2** — Go deeper: identify exact components, source files, and
-  platform constraints; suggest targeted code changes for known fix patterns
-- **Month 3** — Handle complex unknowns: rank root-cause hypotheses, generate
-  diagnostic runbooks, produce multi-file code change suggestions
+- **Month 1** — Bring PipeWire up on Config 1 and Config 2 (guided bringup
+  with prerequisite checklist); classify issues; diagnose basic known issues
+  with config-level fix suggestions
+- **Month 2** — Go deeper: identify exact components and source files per
+  config; apply platform constraints; suggest targeted code changes
+- **Month 3** — Handle complex unknowns: rank root-cause hypotheses per config,
+  generate diagnostic runbooks, produce multi-file code change suggestions
 - **Month 4** — New features: accept architecture input, produce full design
   proposals, generate implementation-ready code scaffolding
 
@@ -27,9 +38,9 @@ specificity at every milestone.
 
 | # | Weeks | Capability | Code suggestion depth |
 |---|---|---|---|
-| M1 | 1–2 | Issue classification | — |
-| M2 | 3–4 | Structured diagnosis for basic issues | Config snippets and known one-line fixes |
-| M3 | 5–6 | Component and source file awareness | Targeted single-file code change suggestions |
+| M1 | 1–2 | Guided bringup for Config 1 and Config 2; issue classification | Config-level fixes; bringup prerequisite checklist |
+| M2 | 3–4 | Structured diagnosis for basic issues (both configs) | Config snippets and known one-line fixes per config |
+| M3 | 5–6 | Component and source file awareness (Config 1 vs Config 2 paths) | Targeted single-file code change suggestions |
 | M4 | 7–8 | Platform intelligence and QLI stack reasoning | Platform-conditional code changes; QLI 2.x-specific patches |
 | M5 | 9–10 | Complex issue — root cause analysis and diagnostics | Multi-file diff suggestions with context and rationale |
 | M6 | 11–12 | Complex issue — full fix delivery | Complete, reviewable code changes across all affected files |
@@ -42,16 +53,49 @@ specificity at every milestone.
 
 # MONTH 1 — Issue Understanding and Basic Diagnosis
 
-**Goal:** The skill reads a plain-English issue description, classifies it,
-and produces a structured first-pass diagnosis for the most common, well-known
-issue types. Code suggestions at this stage are config-level and one-liners —
-things that can be applied immediately without deep code knowledge.
+**Goal:** The skill handles the most fundamental task first — bringing
+PipeWire up on Config 1 (ASoC/ALSA) and Config 2 (AudioReach/PAL). It asks
+for all prerequisites, checks each one, and guides the engineer through the
+bringup sequence. It also classifies issues and produces a structured
+first-pass diagnosis for common known issue types. Code suggestions at this
+stage are config-level and one-liners — things that can be applied immediately
+without deep code knowledge.
 
 ---
 
-## M1 · Weeks 1–2 · Issue Classification
+## M1 · Weeks 1–2 · Guided Bringup and Issue Classification
 
 ### What gets built
+
+Two things in parallel:
+
+**1. Guided bringup for Config 1 and Config 2**
+
+The skill asks for all prerequisites for the requested config, checks each
+one in order, and guides the engineer through the bringup sequence. It knows
+what is needed for each config and each platform, and tells the engineer
+exactly what is missing and how to fix it.
+
+*Config 1 bringup — the skill asks:*
+- Which platform? (IQ9075 / QCS6490 / IQ615 / RB3-Gen2 / ...)
+- Is the ASoC topology file present? (`dmesg | grep tplg`)
+- Are UCM2 files present and named correctly?
+- Is the ALSA sound card visible? (`aplay -l`)
+- Are PipeWire and WirePlumber services running?
+- Is the user in the `audio` group?
+
+*Config 2 bringup — the skill asks:*
+- Which platform?
+- Is ADSP firmware present? (`ls /lib/firmware/qcom/adsp*`)
+- Is remoteproc in `running` state?
+- Is AGM driver loaded? (`lsmod | grep agm`)
+- Is `resourcemanager.xml` present and valid?
+- Is `pipewire-pal-plugin` installed and listed in `pipewire.conf`?
+- Is WirePlumber PAL monitor enabled?
+
+For each missing prerequisite, the skill provides the exact fix command.
+
+**2. Issue classifier**
 
 A classifier that reads a plain-English issue description and maps it to one
 or more of 13 enhancement types. Every subsequent capability depends on
@@ -82,11 +126,19 @@ knowing the type first.
 **Deliverables:**
 - `classify.py` — accepts `--issue` text, returns ranked type list
 - `--list-types` flag, `--verbose` flag
+- `--bringup` mode — guided bringup flow; accepts `--config 1|2` and
+  `--platform <name>`; walks through prerequisite checklist with fix commands
 - `references/enhancement_types.md` — type definitions, keyword lists,
   decision guide for overlapping types
+- `references/component_map.md` — Config 1 and Config 2 architecture,
+  bringup checklists, component source paths
+- `references/platform_matrix.md` — per-platform prerequisites, bringup
+  issue patterns, diagnostic commands
 - Test suite: 15 real issues, expected types, pass/fail report
 
-**Done when:** Correctly classifies 13/15 test issues in under 1 second.
+**Done when:** Correctly classifies 13/15 test issues in under 1 second;
+bringup flow correctly identifies missing prerequisites for both configs
+on at least 3 platforms.
 
 ---
 
@@ -173,6 +225,8 @@ actionable config-level fix suggestion; proposal covers all 10 sections.
 
 ### Month 1 — Capability checkpoint
 
+- Guides bringup of PipeWire on Config 1 (ASoC/ALSA) and Config 2 (AudioReach/PAL)
+- Asks for all prerequisites per config and platform; provides fix for each missing one
 - Classifies any issue into the right type(s) in under 1 second
 - Produces a structured 10-section diagnosis for common issue types
 - Suggests config-level fixes and known one-liners for Types 4, 5, 6, 7, 10
@@ -184,10 +238,12 @@ actionable config-level fix suggestion; proposal covers all 10 sections.
 
 # MONTH 2 — Component Depth and Targeted Code Changes
 
-**Goal:** The skill identifies the exact components and source files involved,
-applies platform constraints, and suggests targeted single-file code changes
-for known fix patterns — specific enough for an engineer to open the file,
-find the location, and apply the change.
+**Goal:** The skill identifies the exact components and source files involved
+for both Config 1 and Config 2 — recognising that the same symptom (e.g. audio
+glitch) has a different root cause and different fix depending on which config
+is running. Applies platform constraints and suggests targeted single-file code
+changes specific enough for an engineer to open the file, find the location,
+and apply the change.
 
 ---
 
@@ -680,8 +736,8 @@ with real, specific content including code suggestions.
 
 | Milestone | Capability | Code suggestion depth |
 |---|---|---|
-| M1 (wk 2) | Classify any issue | None |
-| M2 (wk 4) | Diagnose basic issues | Config snippets, known one-liners |
+| M1 (wk 2) | Guided bringup (Config 1 + Config 2); classify any issue | Bringup fix commands; config snippets |
+| M2 (wk 4) | Diagnose basic issues (both configs) | Config-specific snippets, known one-liners |
 | M3 (wk 6) | Component + source file awareness | Single-file targeted changes with file path and function |
 | M4 (wk 8) | Platform intelligence | Platform-conditional fixes — different code for QLI 1.x vs 2.x |
 | M5 (wk 10) | Root cause hypotheses + diagnostics | Per-hypothesis fix code alongside confirm command |
