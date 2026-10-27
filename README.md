@@ -15,6 +15,7 @@ for Qualcomm platform and AudioReach development.
 | [rpm-packager](skills/rpm-packager/SKILL.md) | End-to-end RPM packaging skeleton generator for CentOS Stream 10 (aarch64) — generates spec files, dist-git sources, and GitHub Actions CI/release workflows modelled on qualcomm-linux/pkg-rpm-audioreach-pal |
 | [orbit-cr-report](skills/orbit-cr-report/SKILL.md) | Fetch a saved Orbit query, parse all CRs, group by Found on Product (target), sort by age, and display Software Image Status (Analysis, Fixed, Build, etc.) with colour coding |
 | [pipewire-enhancement](skills/pipewire-enhancement/SKILL.md) | PipeWire Enhancement Engineer for Qualcomm QLI/AudioReach/PAL/ADSP — classifies enhancement requests across 13 types, maps to affected components, and produces structured 10-section implementation proposals with architecture notes, implementation plan, test plan, and acceptance criteria |
+| [glymur-kernel-deb](skills/glymur-kernel-deb/SKILL.md) | Build any Linux kernel as Debian (.deb) packages and install them on a Glymur CRD target device — covers capturing the running kernel config, cross-compiling with bindeb-pkg, transferring packages via SCP or ADB, installing with dpkg, and updating the EFI boot entry |
 
 ---
 
@@ -443,6 +444,49 @@ python3 skills/pipewire-enhancement/scripts/analyze_enhancement.py --list-types
 - `references/platform_matrix.md` — per-platform capabilities, known issue patterns, diagnostic commands
 - `references/examples.md` — three full worked examples
 
+
+---
+
+## glymur-kernel-deb Skill
+
+### What it does
+
+Guides you through building any Linux kernel as Debian (`.deb`) packages and
+installing them on a **Glymur CRD** target device.
+
+| Step | What happens |
+|---|---|
+| Capture config | `zcat /proc/config.gz` pulled from the running target |
+| Cross-compile | `make bindeb-pkg` with `ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu-` |
+| Transfer | SCP or ADB push of `linux-*.deb` to `/tmp/` on the target |
+| Install | `sudo dpkg -i /tmp/linux-*.deb` |
+| Boot entry | Appends `devicetree /dtb/qcom/glymur-crd.dtb` to the EFI loader entry |
+| Verify | `uname -a` after reboot confirms the new kernel |
+
+### Usage
+
+Just describe what you want to do — the skill walks you through each step interactively:
+
+```
+Build and install a kernel .deb on my Glymur CRD device
+```
+
+Or reference the step-by-step workflow directly in `skills/glymur-kernel-deb/SKILL.md`.
+
+### Prerequisites
+
+- `gcc-aarch64-linux-gnu`, `make`, `dpkg-dev`, `libssl-dev` on the host
+- `adb` or `scp` access to the target
+- Permissions to install packages and edit EFI boot entries on the target
+
+```bash
+sudo apt-get install gcc-aarch64-linux-gnu make dpkg-dev libssl-dev
+```
+
+### References
+
+- Source: [Build and Install Kernel .deb Glymur](https://qualcomm-confluence.atlassian.net/wiki/spaces/LinuxAudio/pages/3610140392/Build+and+Install+Kernel+.deb+Glymur)
+- Kernel repo: [qualcomm-linux/kernel](https://github.com/qualcomm-linux/kernel)
 
 ## Requirements
 
