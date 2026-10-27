@@ -59,6 +59,29 @@ A standalone classifier script that reads a plain-English issue description
 and maps it to one or more of 13 enhancement types. This is the foundation
 everything else builds on.
 
+**The 13 enhancement types — what they mean and what triggers them:**
+
+| # | Type | Plain meaning | Example issue |
+|---|---|---|---|
+| 1 | **New PipeWire feature** | Something that doesn't exist yet — build from scratch | *"Add compressed offload support in QLI 2.x"* |
+| 2 | **Existing feature enhancement** | Something works but needs to work better | *"Improve BT audio quality on IQ9075"* |
+| 3 | **Performance improvement** | Latency, CPU usage, power consumption, offload efficiency | *"Reduce audio latency on QCS6490"* |
+| 4 | **Startup / enumeration improvement** | Device not showing up, missing sound card, boot ordering race | *"Audio device not detected after reboot"* |
+| 5 | **Audio quality improvement** | Glitch, tick, pop, noise, crackle, distortion during playback or capture | *"Tick sound at start of every playback on IQ9075"* |
+| 6 | **Routing or policy enhancement** | Wrong sink/source selected, SSMD, device switching, WirePlumber policy | *"Audio goes to wrong output after Bluetooth connects"* |
+| 7 | **Configuration enhancement** | Config 1 vs Config 2, topology .bin files, Lua config, WirePlumber settings | *"Config 2 topology not loading on SA8775P"* |
+| 8 | **PAL / AudioReach integration** | Anything touching PAL, AudioReach, ADSP, AGM, SPF — the Qualcomm-specific layer | *"PAL stream open fails after modem restart"* |
+| 9 | **API or ABI enhancement** | Changes to interfaces between components — protocol, API contract, ABI compatibility | *"PipeWire API change breaks pipewire-pal-plugin"* |
+| 10 | **Debugging / root-cause investigation** | Don't know what's wrong yet — need to investigate first | *"Random audio dropout, no obvious cause"* |
+| 11 | **Documentation enhancement** | Something needs to be written, updated, or explained | *"No documentation for SSMD setup on IQ9075"* |
+| 12 | **Test or validation enhancement** | Adding tests, automating validation, CI coverage | *"No automated test for compressed offload path"* |
+| 13 | **Packaging or deployment enhancement** | Yocto recipes, Debian packages, RPM specs, deployment scripts | *"PipeWire Yocto recipe missing PACKAGECONFIG for PAL"* |
+
+> Most real issues hit **2 types simultaneously** — e.g. *"tick at playback start"* triggers
+> both Type 5 (audio quality) and Type 10 (debugging), because you need to investigate
+> before you can fix. The classifier returns a primary type and secondary types, and the
+> proposal covers all of them.
+
 ### Why it matters to the Director
 
 Every issue that comes in today gets triaged manually — someone reads it,
