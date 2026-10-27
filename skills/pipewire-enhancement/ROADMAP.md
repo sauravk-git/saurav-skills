@@ -1,11 +1,11 @@
-# PipeWire Enhancement Skill — 4-Month Roadmap
+# PipeWire Enhancement Skill — 5-Month Roadmap
 
 ---
 
 ## Overview
 
 Build a PipeWire Enhancement Engineering assistant for Qualcomm QLI /
-AudioReach / PAL stacks that grows in capability across four months.
+AudioReach / PAL stacks that grows in capability across five months.
 
 The skill covers both audio backend configurations:
 
@@ -19,18 +19,20 @@ The skill covers both audio backend configurations:
 
 The progression follows the natural order of engineering work:
 
-- **Month 1** — Bring PipeWire up on Config 1 and Config 2 (guided bringup
-  with prerequisite checklist); classify issues; diagnose basic known issues
-  with config-level fix suggestions
-- **Month 2** — Go deeper: identify exact components and source files per
-  config; apply platform constraints; suggest targeted code changes
-- **Month 3** — Handle complex unknowns: rank root-cause hypotheses per config,
-  generate diagnostic runbooks, produce multi-file code change suggestions
-- **Month 4** — New features: accept architecture input, produce full design
-  proposals, generate implementation-ready code scaffolding
+- **Month 1** — Bring PipeWire up on Config 1 (ASoC/ALSA): guided prerequisite
+  checklist, bringup sequence, common bringup issue fixes. Issue classifier.
+- **Month 2** — Bring PipeWire up on Config 2 (AudioReach/PAL): guided
+  prerequisite checklist, bringup sequence, common bringup issue fixes.
+  Basic issue diagnosis with config-level fix suggestions.
+- **Month 3** — Component depth: identify exact source files per config;
+  platform constraints; targeted single-file code changes.
+- **Month 4** — Complex issues: root cause hypotheses, diagnostic runbooks,
+  multi-file code change suggestions.
+- **Month 5** — New features: architecture input, design proposals,
+  implementation-ready code scaffolding and full implementation guidance.
 
-Code change suggestions are present from Month 1 and grow in depth and
-specificity at every milestone.
+Code change suggestions are present from Month 1 and grow in depth at every
+milestone.
 
 ---
 
@@ -38,68 +40,92 @@ specificity at every milestone.
 
 | # | Weeks | Capability | Code suggestion depth |
 |---|---|---|---|
-| M1 | 1–2 | Guided bringup for Config 1 and Config 2; issue classification | Config-level fixes; bringup prerequisite checklist |
-| M2 | 3–4 | Structured diagnosis for basic issues (both configs) | Config snippets and known one-line fixes per config |
-| M3 | 5–6 | Component and source file awareness (Config 1 vs Config 2 paths) | Targeted single-file code change suggestions |
-| M4 | 7–8 | Platform intelligence and QLI stack reasoning | Platform-conditional code changes; QLI 2.x-specific patches |
-| M5 | 9–10 | Complex issue — root cause analysis and diagnostics | Multi-file diff suggestions with context and rationale |
-| M6 | 11–12 | Complex issue — full fix delivery | Complete, reviewable code changes across all affected files |
-| M7 | 13–14 | New feature — design and scaffolding | Architecture-driven code scaffolding and API stubs |
-| M8 | 15–16 | New feature — full implementation guidance | End-to-end implementation code with integration plan |
+| M1 | 1–2 | Config 1 bringup (ASoC/ALSA); issue classifier | Bringup fix commands; config snippets |
+| M2 | 3–5 | Config 2 bringup (AudioReach/PAL) | Bringup fix commands; PAL/AGM config snippets |
+| M3 | 6–7 | Basic issue diagnosis — both configs | Config-specific snippets; known one-liners per config |
+| M4 | 8–9 | Component and source file awareness | Targeted single-file code changes |
+| M5 | 10–11 | Platform intelligence and QLI stack reasoning | Platform-conditional code changes |
+| M6 | 12–13 | Complex issue — root cause analysis and diagnostics | Per-hypothesis fix code + diagnostic runbook |
+| M7 | 14–15 | Complex issue — full multi-file fix delivery | Complete reviewable code changes with test additions |
+| M8 | 16–17 | New feature — design and code scaffolding | API stubs, new file skeletons, integration hooks |
+| M9 | 18–19 | New feature — full implementation guidance | Complete implementation code with integration plan |
+| M10 | 20 | QGenie packaging and skill hardening | — |
 
 ---
 
 ---
 
-# MONTH 1 — Issue Understanding and Basic Diagnosis
+# MONTH 1 — Config 1 Bringup and Issue Classification
 
-**Goal:** The skill handles the most fundamental task first — bringing
-PipeWire up on Config 1 (ASoC/ALSA) and Config 2 (AudioReach/PAL). It asks
-for all prerequisites, checks each one, and guides the engineer through the
-bringup sequence. It also classifies issues and produces a structured
-first-pass diagnosis for common known issue types. Code suggestions at this
-stage are config-level and one-liners — things that can be applied immediately
-without deep code knowledge.
+**Goal:** Get PipeWire working on Config 1 (ASoC/ALSA). The skill asks for
+every prerequisite, checks each one in order, identifies what is missing, and
+provides the exact fix. Alongside this, the issue classifier is built — the
+foundation every later milestone depends on.
+
+Config 1 bringup is handled first because it is the simpler stack (no ADSP,
+no remoteproc, no PAL) and is supported on all QLI platforms. Getting it
+right establishes the baseline before tackling Config 2.
 
 ---
 
-## M1 · Weeks 1–2 · Guided Bringup and Issue Classification
+## M1 · Weeks 1–2 · Config 1 Bringup and Issue Classifier
 
 ### What gets built
 
-Two things in parallel:
+**1. Config 1 guided bringup**
 
-**1. Guided bringup for Config 1 and Config 2**
+The skill walks through the Config 1 prerequisite chain in order. For each
+item it checks whether it is satisfied and, if not, provides the exact
+command to fix it.
 
-The skill asks for all prerequisites for the requested config, checks each
-one in order, and guides the engineer through the bringup sequence. It knows
-what is needed for each config and each platform, and tells the engineer
-exactly what is missing and how to fix it.
+*Prerequisites the skill checks (in order):*
 
-*Config 1 bringup — the skill asks:*
-- Which platform? (IQ9075 / QCS6490 / IQ615 / RB3-Gen2 / ...)
-- Is the ASoC topology file present? (`dmesg | grep tplg`)
-- Are UCM2 files present and named correctly?
-- Is the ALSA sound card visible? (`aplay -l`)
-- Are PipeWire and WirePlumber services running?
-- Is the user in the `audio` group?
+| # | Prerequisite | Check command | Common fix |
+|---|---|---|---|
+| 1 | ASoC topology file loaded by kernel | `dmesg \| grep -i tplg` | Copy correct `.bin` to `/lib/firmware/qcom/` |
+| 2 | ALSA sound card visible | `aplay -l` | Reload ASoC driver: `modprobe -r snd_soc_<plat> && modprobe snd_soc_<plat>` |
+| 3 | UCM2 directory present and named correctly | `ls /usr/share/alsa/ucm2/` | Rename or symlink to match `cat /proc/asound/card*/id` |
+| 4 | UCM2 verbs load without error | `alsaucm -c <card> list _verbs` | Fix UCM2 syntax errors in `HiFi.conf` |
+| 5 | PipeWire service running | `systemctl --user status pipewire` | `systemctl --user enable --now pipewire` |
+| 6 | WirePlumber service running | `systemctl --user status wireplumber` | `systemctl --user enable --now wireplumber` |
+| 7 | WirePlumber ALSA monitor enabled | `grep -r alsa /etc/wireplumber/` | Enable ALSA monitor in `wireplumber.conf` |
+| 8 | PipeWire sees ALSA nodes | `pw-cli ls Node \| grep alsa` | Restart WirePlumber after card confirmed present |
+| 9 | User in audio group | `id \| grep audio` | `sudo usermod -aG audio $USER` then re-login |
+| 10 | Basic playback works | `pw-play /usr/share/sounds/alsa/Front_Left.wav` | Check steps 1–9 |
 
-*Config 2 bringup — the skill asks:*
-- Which platform?
-- Is ADSP firmware present? (`ls /lib/firmware/qcom/adsp*`)
-- Is remoteproc in `running` state?
-- Is AGM driver loaded? (`lsmod | grep agm`)
-- Is `resourcemanager.xml` present and valid?
-- Is `pipewire-pal-plugin` installed and listed in `pipewire.conf`?
-- Is WirePlumber PAL monitor enabled?
+*Platform-specific topology filenames known to the skill:*
 
-For each missing prerequisite, the skill provides the exact fix command.
+| Platform | Topology file (typical) |
+|---|---|
+| IQ615 | `sm6115-wcd937x-snd-card-tplg.bin` |
+| IQ8275-EVK | `sm8275-<codec>-snd-card-tplg.bin` |
+| IQ9075 | `sun-<codec>-snd-card-tplg.bin` |
+| RB3-Gen2 | `qcs6490-rb3gen2-<codec>-tplg.bin` |
+| QCS6490 | `qcs6490-<codec>-snd-card-tplg.bin` |
+
+*Config-level fix suggestions for common Config 1 bringup failures:*
+
+```bash
+# UCM2 directory name mismatch — most common Config 1 bringup failure
+CARD=$(cat /proc/asound/card0/id)
+ls /usr/share/alsa/ucm2/ | grep -i "$CARD"
+# If no match — create symlink:
+sudo ln -s /usr/share/alsa/ucm2/<existing-dir> /usr/share/alsa/ucm2/$CARD
+systemctl --user restart wireplumber
+```
+
+```ini
+# WirePlumber not starting before ALSA card is ready
+# /etc/systemd/system/wireplumber.service.d/override.conf
+[Unit]
+After=sound.target
+Wants=sound.target
+```
 
 **2. Issue classifier**
 
 A classifier that reads a plain-English issue description and maps it to one
-or more of 13 enhancement types. Every subsequent capability depends on
-knowing the type first.
+or more of 13 enhancement types. Every subsequent milestone depends on this.
 
 **The 13 enhancement types:**
 
@@ -125,31 +151,133 @@ knowing the type first.
 
 **Deliverables:**
 - `classify.py` — accepts `--issue` text, returns ranked type list
-- `--list-types` flag, `--verbose` flag
-- `--bringup` mode — guided bringup flow; accepts `--config 1|2` and
-  `--platform <name>`; walks through prerequisite checklist with fix commands
-- `references/enhancement_types.md` — type definitions, keyword lists,
-  decision guide for overlapping types
-- `references/component_map.md` — Config 1 and Config 2 architecture,
-  bringup checklists, component source paths
-- `references/platform_matrix.md` — per-platform prerequisites, bringup
-  issue patterns, diagnostic commands
+- `--list-types` and `--verbose` flags
+- `--bringup --config 1 --platform <name>` — Config 1 guided bringup mode;
+  walks through the 10-step checklist; provides fix for each missing item
+- `references/enhancement_types.md` — type definitions, keyword lists
+- `references/component_map.md` — Config 1 architecture, component source
+  paths, bringup checklist
+- `references/platform_matrix.md` — per-platform topology filenames,
+  Config 1 bringup issue patterns
 - Test suite: 15 real issues, expected types, pass/fail report
 
-**Done when:** Correctly classifies 13/15 test issues in under 1 second;
-bringup flow correctly identifies missing prerequisites for both configs
-on at least 3 platforms.
+**Done when:** Config 1 bringup flow correctly identifies missing prerequisites
+on at least 3 platforms and provides working fix commands; classifier correctly
+classifies 13/15 test issues.
 
 ---
 
-## M2 · Weeks 3–4 · Basic Issue Diagnosis with Config-Level Fix Suggestions
+### Month 1 — Capability checkpoint
+
+- Guides Config 1 (ASoC/ALSA) bringup end-to-end with prerequisite checklist
+- Identifies missing prerequisites and provides exact fix commands
+- Knows platform-specific topology filenames and UCM2 requirements
+- Classifies any issue into the right type(s) in under 1 second
+
+---
+
+---
+
+# MONTH 2 — Config 2 Bringup and Basic Issue Diagnosis
+
+**Goal:** Get PipeWire working on Config 2 (AudioReach/PAL). Config 2 has
+a deeper prerequisite chain than Config 1 — ADSP firmware, remoteproc,
+AGM driver, PAL config, and pipewire-pal-plugin all need to be in place
+before audio works. The skill handles each layer in order and knows the
+failure mode at each step. Basic issue diagnosis is also added this month.
+
+---
+
+## M2 · Weeks 3–5 · Config 2 Bringup (AudioReach / PAL)
+
+### What gets built
+
+The skill walks through the Config 2 prerequisite chain in order, layer by
+layer from firmware up to PipeWire. Each layer has distinct failure modes
+and the skill knows the fix for each.
+
+*Prerequisites the skill checks (in order):*
+
+| # | Layer | Prerequisite | Check command | Common fix |
+|---|---|---|---|---|
+| 1 | Firmware | ADSP firmware present | `ls /lib/firmware/qcom/adsp*` | Copy firmware from BSP package |
+| 2 | Firmware | AudioReach topology present | `ls /lib/firmware/qcom/*tplg*` | Copy topology `.bin` from BSP |
+| 3 | remoteproc | ADSP in `running` state | `cat /sys/class/remoteproc/remoteproc*/state` | `echo start > /sys/class/remoteproc/remoteproc<N>/state` |
+| 4 | Kernel | AGM driver loaded | `lsmod \| grep agm` | `modprobe agm` or rebuild kernel with `CONFIG_SND_SOC_MSM_QDSP6_AGM=m` |
+| 5 | PAL | `resourcemanager.xml` present | `ls /etc/pal/resourcemanager.xml` | Copy from BSP or platform package |
+| 6 | PAL | `resourcemanager.xml` valid XML | `xmllint --noout /etc/pal/resourcemanager.xml` | Fix XML syntax errors |
+| 7 | PAL | PAL library present | `ldconfig -p \| grep libpal` | Install `libpal` package |
+| 8 | pipewire-pal-plugin | Plugin installed | `ls /usr/lib/pipewire-*/libpipewire-module-pal*.so` | Install `pipewire-pal-plugin` package |
+| 9 | pipewire-pal-plugin | Plugin listed in `pipewire.conf` | `grep -r pal /etc/pipewire/` | Add PAL module to `pipewire.conf.d/` |
+| 10 | WirePlumber | PAL monitor enabled | `wpctl status` shows PAL devices | Enable PAL monitor in WirePlumber config |
+| 11 | PipeWire | PAL nodes visible | `pw-cli ls Node \| grep pal` | Restart PipeWire and WirePlumber |
+| 12 | End-to-end | Basic playback works | `pw-play /usr/share/sounds/alsa/Front_Left.wav` | Check PAL log: `logcat -s PAL:V AGM:V` |
+
+*Platform-specific firmware filenames known to the skill:*
+
+| Platform | ADSP firmware | AudioReach topology |
+|---|---|---|
+| IQ9075 | `adsp.mbn` | `sun-adsp-tplg.bin` |
+| QCS6490 | `adsp.mbn` | `qcs6490-adsp-tplg.bin` |
+| SA8775P | `adsp.mbn` | `sa8775p-adsp-tplg.bin` |
+| IQ8275-EVK | `adsp.mbn` | `sm8275-adsp-tplg.bin` |
+| RB3-Gen2 | `adsp.mbn` | `qcs6490-rb3gen2-adsp-tplg.bin` |
+
+*Config-level fix suggestions for common Config 2 bringup failures:*
+
+```bash
+# remoteproc not starting — most common Config 2 bringup failure
+dmesg | grep -i "remoteproc\|adsp\|firmware" | tail -20
+# Check firmware path the driver expects:
+cat /sys/class/remoteproc/remoteproc<N>/firmware
+# Copy firmware to expected path, then:
+echo start > /sys/class/remoteproc/remoteproc<N>/state
+```
+
+```bash
+# PAL nodes not appearing in PipeWire
+# Check pipewire.conf has PAL module:
+grep -r "pal" /etc/pipewire/ /usr/share/pipewire/
+# If missing — add:
+cat > /etc/pipewire/pipewire.conf.d/99-pal.conf << 'CONF'
+context.modules = [
+  { name = libpipewire-module-pal-device }
+]
+CONF
+systemctl --user restart pipewire wireplumber
+```
+
+```bash
+# PAL stream open failing — check resourcemanager.xml has required usecases
+xmllint --noout /etc/pal/resourcemanager.xml && echo "XML valid"
+grep -i "PCM_RT_PROXY\|DEEP_BUFFER\|LOW_LATENCY" /etc/pal/resourcemanager.xml
+# Check PAL log for specific error:
+logcat -s PAL:V AGM:V | grep -i "error\|fail\|open" | head -20
+```
+
+**Deliverables:**
+- `--bringup --config 2 --platform <name>` — Config 2 guided bringup mode;
+  walks through the 12-step checklist layer by layer; provides fix for each
+  missing item
+- `references/component_map.md` updated with Config 2 component map,
+  layer-by-layer architecture, and bringup checklist
+- `references/platform_matrix.md` updated with Config 2 bringup issue
+  patterns (remoteproc failures, AGM not loading, PAL stream open errors,
+  pipewire-pal-plugin not appearing)
+
+**Done when:** Config 2 bringup flow correctly identifies missing prerequisites
+on at least 3 QLI 2.x platforms and provides working fix commands for each
+failure mode.
+
+---
+
+## M3 · Weeks 6–7 · Basic Issue Diagnosis with Config-Level Fix Suggestions
 
 ### What gets built
 
 Extend the classifier into a full diagnosis tool for basic, well-known issue
-types. Produces a structured 10-section document. Adds the first layer of
-code change suggestions — config snippets and known one-line fixes that apply
-to the most common patterns.
+types. Produces a structured 10-section document. Adds config-level fix
+suggestions — the first thing to try before any code change.
 
 **The 10-section proposal structure:**
 
@@ -157,33 +285,18 @@ to the most common patterns.
 |---|---|---|
 | 1 | Summary | Plain-English restatement of issue + goal |
 | 2 | Classification | Matched types from M1 |
-| 3 | Affected Components | Placeholder — filled in M3 |
-| 4 | Gap Analysis | Missing info: platform, version, logs |
-| 5 | Architecture Notes | Known pattern description for this issue type |
-| 6 | Implementation Plan | Generic task list for this issue type |
+| 3 | Affected Components | Placeholder — filled in M4 |
+| 4 | Gap Analysis | Missing info: config, platform, version, logs |
+| 5 | Architecture Notes | Known pattern for this issue type and config |
+| 6 | Implementation Plan | Task list + config-level fix suggestions |
 | 7 | Test & Validation Plan | Standard test cases for this issue type |
 | 8 | Documentation Tasks | What docs to update based on type |
 | 9 | Open Questions & Risks | Standard risks for this issue type |
-| 10 | Acceptance Criteria | Measurable done conditions for this type |
+| 10 | Acceptance Criteria | Measurable done conditions |
 
-**Code suggestion depth at M2 — config snippets and known one-liners:**
+**Config-level fix suggestions — examples:**
 
-For the most common issue types, the skill suggests the first thing to try
-before any code change — a config tweak, a WirePlumber Lua setting, or a
-known one-line fix that resolves the issue in many cases.
-
-Examples:
-
-*Startup / enumeration race (Type 4):*
-```ini
-# /etc/systemd/system/wireplumber.service.d/override.conf
-# Add ADSP/remoteproc dependency so WirePlumber waits for the sound card
-[Unit]
-After=sound.target
-Wants=sound.target
-```
-
-*Audio glitch — try lower quantum first (Type 5):*
+*Config 1 — audio glitch, try quantum tuning first:*
 ```bash
 # /etc/pipewire/pipewire.conf.d/99-quantum.conf
 context.properties = {
@@ -192,109 +305,108 @@ context.properties = {
 }
 ```
 
-*Wrong default sink (Type 6):*
+*Config 2 — topology not loading:*
 ```bash
-# WirePlumber — set default sink by name
-wpctl set-default $(wpctl status | grep "IQ9075" | awk '{print $2}' | tr -d '.')
-```
-
-*Config 2 topology not loading (Type 7):*
-```bash
-# Verify topology .bin is present and readable
-ls -lh /lib/firmware/qcom/*.bin
-# Check PAL log for topology load errors
+ls -lh /lib/firmware/qcom/*tplg*
 logcat -s PAL:V | grep -i 'topology\|bin\|load'
 ```
 
-**Issue types with real content at M2:**
-- Type 4: Startup / enumeration
-- Type 5: Audio quality (glitch, tick, pop)
-- Type 6: Routing / policy
-- Type 7: Configuration
-- Type 10: Debugging / RCA
+*Both configs — wrong default sink:*
+```bash
+wpctl set-default $(wpctl status | grep "IQ9075" | awk '{print $2}' | tr -d '.')
+```
+
+*Both configs — WirePlumber startup race:*
+```ini
+# /etc/systemd/system/wireplumber.service.d/override.conf
+[Unit]
+After=sound.target
+Wants=sound.target
+```
+
+**Issue types with real content at M3:**
+- Type 4: Startup / enumeration (both configs)
+- Type 5: Audio quality — glitch, tick, pop (both configs)
+- Type 6: Routing / policy (both configs)
+- Type 7: Configuration — topology, UCM2, PAL config (both configs)
+- Type 10: Debugging / RCA (both configs)
 
 **Deliverables:**
 - `analyze_enhancement.py` — extends `classify.py`
 - Conversational mode, `--from-file`, `--no-color`, `--output markdown`
-- Config snippet suggestions embedded in Section 6 for Types 4, 5, 6, 7, 10
+- Config-aware fix suggestions: skill asks which config is running and
+  tailors suggestions accordingly
 
 **Done when:** Output for Types 4, 5, 6, 7, 10 includes at least one
-actionable config-level fix suggestion; proposal covers all 10 sections.
+actionable config-specific fix suggestion; proposal covers all 10 sections.
 
 ---
 
-### Month 1 — Capability checkpoint
+### Month 2 — Capability checkpoint
 
-- Guides bringup of PipeWire on Config 1 (ASoC/ALSA) and Config 2 (AudioReach/PAL)
-- Asks for all prerequisites per config and platform; provides fix for each missing one
-- Classifies any issue into the right type(s) in under 1 second
-- Produces a structured 10-section diagnosis for common issue types
-- Suggests config-level fixes and known one-liners for Types 4, 5, 6, 7, 10
-- Identifies what information is missing before work can start
+- Guides Config 2 (AudioReach/PAL) bringup end-to-end, layer by layer
+- Knows firmware, remoteproc, AGM, PAL, and pipewire-pal-plugin failure modes
+- Produces structured 10-section diagnosis for common issue types
+- Suggests config-specific fix snippets for Types 4, 5, 6, 7, 10
 
 ---
 
 ---
 
-# MONTH 2 — Component Depth and Targeted Code Changes
+# MONTH 3 — Component Depth and Targeted Code Changes
 
 **Goal:** The skill identifies the exact components and source files involved
-for both Config 1 and Config 2 — recognising that the same symptom (e.g. audio
-glitch) has a different root cause and different fix depending on which config
-is running. Applies platform constraints and suggests targeted single-file code
-changes specific enough for an engineer to open the file, find the location,
-and apply the change.
+for both Config 1 and Config 2 — recognising that the same symptom has a
+different root cause and different fix depending on which config is running.
+Applies platform constraints and suggests targeted single-file code changes.
 
 ---
 
-## M3 · Weeks 5–6 · Component Awareness and Single-File Code Suggestions
+## M4 · Weeks 8–9 · Component Awareness and Single-File Code Suggestions
 
 ### What gets built
 
 Section 3 (Affected Components) goes from a placeholder to a precise table
 with source file paths. Code suggestions grow from config snippets to targeted
-single-file changes — showing the exact function, the change needed, and why.
+single-file changes — exact file, function, before/after diff, rationale.
 
-**Component coverage:**
+**Component map — Config 1 vs Config 2 for the same symptom:**
 
-| Issue keyword | Affected components | Key source paths |
+| Symptom | Config 1 components | Config 2 components |
 |---|---|---|
-| glitch / tick / pop | SPA (spa.alsa), PipeWire Core (node state), pipewire-pal-plugin (stream lifecycle), PAL (usecase ramp), AudioReach/ADSP (codec pop) | `spa/plugins/alsa/alsa-pcm.c`, `src/modules/module-pal-sink.c`, `Pal.cpp` |
-| startup / enumeration | WirePlumber (device discovery), Yocto (systemd ordering), PAL (remoteproc startup) | `modules/module-device-activation.c`, `wireplumber.conf` |
-| latency / performance | PipeWire Core (quantum/scheduling), SPA (buffer tuning), PAL (DSP offload) | `src/pipewire/impl-node.c`, `src/modules/module-rt.c` |
-| SSMD / multi-device | PAL (multi-device usecase), AudioReach (SSMD topology), WirePlumber (multi-sink policy) | `ResourceManager.cpp`, `AudioReachGraph.cpp` |
-| routing / policy | WirePlumber (default sink/source), PipeWire Core (link management) | `modules/module-default-nodes.c`, `module-si-standard-link.c` |
-| Config 1 / Config 2 | PAL (topology selection), AudioReach (.bin loading), Yocto (firmware packaging) | `Pal.cpp`, `/lib/firmware/qcom/` |
-| Fluence / voice | AudioReach/ADSP (Fluence graph), PAL (voice usecase), WirePlumber (capture routing) | `AudioReachGraph.cpp`, `resourcemanager.xml` |
-| compressed offload | SPA (compress path), PAL (StreamCompress), PipeWire Core (compressed scheduling) | `spa/plugins/alsa/alsa-compress-offload.c`, `StreamCompress.cpp` |
+| Glitch / tick / pop | `spa/plugins/alsa/alsa-pcm.c` (pre-roll), `alsa-sink.c` (underrun) | `Pal.cpp` (mute ramp), `module-pal-sink.c` (stream lifecycle) |
+| Device not found | `modules/module-device-activation.c`, `wireplumber.conf` | `ResourceManager.cpp`, remoteproc state |
+| Latency / performance | `src/pipewire/impl-node.c` (quantum), `alsa-pcm.c` (period size) | `src/pipewire/impl-node.c`, `StreamPCM.cpp` (ADSP buffer) |
+| Routing / policy | `modules/module-default-nodes.c`, WirePlumber Lua | `modules/module-default-nodes.c`, WirePlumber Lua |
+| Config / topology | `/usr/share/alsa/ucm2/`, ASoC topology `.bin` | `/etc/pal/resourcemanager.xml`, AudioReach topology `.bin` |
 
-**Code suggestion depth at M3 — targeted single-file changes:**
+**Single-file code suggestion examples:**
 
-For each known fix pattern, the skill shows the exact location in the source
-file and the change to make.
-
-*Audio glitch — add pre-roll silent buffer in spa.alsa:*
+*Config 1 — audio glitch, add pre-roll buffer:*
 ```c
-/* spa/plugins/alsa/alsa-pcm.c — in alsa_pcm_start() */
-
-/* Before: start DMA immediately */
-snd_pcm_start(state->hndl);
-
-/* After: write one period of silence before starting */
-spa_zero(state->silence_buf);
-snd_pcm_writei(state->hndl, state->silence_buf, state->period_frames);
-snd_pcm_start(state->hndl);
+/* spa/plugins/alsa/alsa-pcm.c — alsa_pcm_start() */
+- snd_pcm_start(state->hndl);
++ spa_zero(state->silence_buf);
++ snd_pcm_writei(state->hndl, state->silence_buf, state->period_frames);
++ snd_pcm_start(state->hndl);
 ```
 
-*Startup race — add device-ready wait in WirePlumber:*
+*Config 2 — audio glitch, add PAL mute ramp:*
+```cpp
+/* PAL/src/Pal.cpp — pal_stream_start() */
+- status = rm->getAudioRoute(stream_handle);
++ pal_stream_set_mute(stream_handle, true);
++ status = rm->getAudioRoute(stream_handle);
++ usleep(IQ9075_CODEC_RAMP_US);
++ pal_stream_set_mute(stream_handle, false);
+```
+
+*Config 1 — WirePlumber startup race:*
 ```lua
 -- /etc/wireplumber/main.lua.d/51-device-wait.lua
--- Wait for ALSA card to appear before activating nodes
 rule = {
   matches = { { { "device.name", "matches", "alsa_card.*" } } },
-  apply_properties = {
-    ["device.disabled"] = false,
-  },
+  apply_properties = { ["device.disabled"] = false },
 }
 table.insert(alsa_monitor.rules, rule)
 ```
@@ -302,24 +414,22 @@ table.insert(alsa_monitor.rules, rule)
 **Deliverables:**
 - Section 3 auto-populated: component, sub-component, source path, change type
 - Section 6 includes single-file code change suggestions with file path,
-  function name, before/after diff, and rationale
+  function, before/after diff, and rationale
+- Config-aware: different components and code shown for Config 1 vs Config 2
 - `--show-components` flag
-- `references/component_map.md` expanded: full source-file mapping,
-  AudioReach graph chain, SPA plugin registry, WirePlumber Lua locations
 
 **Done when:** Code suggestions point to the correct file and function for
-8/10 test cases; an engineer can apply the suggestion without additional research.
+8/10 test cases; Config 1 and Config 2 fixes are distinct where root cause differs.
 
 ---
 
-## M4 · Weeks 7–8 · Platform Intelligence and Platform-Conditional Code Changes
+## M5 · Weeks 10–11 · Platform Intelligence and Platform-Conditional Code Changes
 
 ### What gets built
 
 The skill learns platform capabilities and QLI 1.x vs 2.x differences.
 Code suggestions become platform-conditional — the right fix for IQ9075
-(QLI 2.x, PAL path) is different from the right fix for IQ615 (QLI 1.x,
-spa.alsa direct path).
+(QLI 2.x, Config 2) is different from IQ615 (QLI 1.x, Config 1 only).
 
 **Platform capability matrix:**
 
@@ -336,99 +446,78 @@ spa.alsa direct path).
 
 | Feature | QLI 1.x | QLI 2.x |
 |---|---|---|
-| Audio backend | ALSA (spa.alsa direct) | PAL → AudioReach → ADSP |
-| DSP offload | No | Yes |
-| SSMD | No | Yes |
-| Fluence | No | Yes |
-| Config 2 | No | Yes |
-| Modem audio | No | Yes |
-| BT offload | No | Yes |
+| Config 1 (ASoC/ALSA) | ✓ | ✓ |
+| Config 2 (AudioReach/PAL) | ✗ | ✓ |
+| ADSP audio offload | ✗ | ✓ |
+| SSMD | ✗ | ✓ |
+| Fluence | ✗ | ✓ |
+| Always-on audio | ✗ | ✓ |
+| BT offload | ✗ | ✓ |
+| Modem audio | ✗ | ✓ |
 | WirePlumber | 0.4.x | 0.5.x |
 | PipeWire | 0.3.x | 1.x |
-| pipewire-pal-plugin | No | Yes |
 
-**Code suggestion depth at M4 — platform-conditional changes:**
+**Platform-conditional code suggestion example:**
 
-The skill generates the correct fix for the detected platform, not a generic one.
+*Same symptom (audio glitch), different fix per platform + config:*
 
-*Audio glitch fix — QLI 1.x (spa.alsa direct path):*
-```c
-/* spa/plugins/alsa/alsa-pcm.c */
-/* Fix: add pre-roll silent buffer before DMA start */
-memset(state->buffer, 0, state->period_size);
-snd_pcm_writei(state->hndl, state->buffer, state->period_frames);
-snd_pcm_start(state->hndl);
 ```
+IQ615 (QLI 1.x, Config 1 only):
+  Fix in: spa/plugins/alsa/alsa-pcm.c
+  Root cause: SPA/ALSA underrun — no ADSP involved
 
-*Audio glitch fix — QLI 2.x (PAL path, different root cause):*
-```cpp
-/* PAL/src/Pal.cpp — in pal_stream_start() */
-/* Fix: apply mute before codec ramp to suppress pop */
-pal_stream_set_mute(stream_handle, true);
-status = rm->getAudioRoute(stream_handle);
-/* Allow codec ramp to settle (platform-specific delay) */
-usleep(IQ9075_CODEC_RAMP_US);
-pal_stream_set_mute(stream_handle, false);
+IQ9075 (QLI 2.x, Config 1):
+  Fix in: spa/plugins/alsa/alsa-pcm.c
+  Root cause: same as IQ615
+
+IQ9075 (QLI 2.x, Config 2):
+  Fix in: PAL/src/Pal.cpp
+  Root cause: codec pop on PAL stream open — different fix entirely
 ```
 
 **Deliverables:**
 - Auto-detect platform from issue text; `--platform` flag for override
-- Platform constraint warnings in Section 4
-- Platform context block in every proposal
-- Code suggestions in Section 6 are platform-specific — different fix shown
-  for QLI 1.x vs QLI 2.x for the same symptom
+- Platform constraint warnings (e.g. "SSMD requires QLI 2.x and Config 2")
+- Code suggestions are platform + config specific
 - `--list-platforms` flag
-- `references/platform_matrix.md` expanded: known issue patterns per platform,
-  firmware dependency notes, Config 1 vs Config 2 switching procedure
 
 **Done when:** Platform auto-detected in 9/10 cases; code suggestions are
-correct for the detected platform; QLI 1.x and QLI 2.x fixes are distinct
-where the root cause differs.
+correct for the detected platform and config combination.
 
 ---
 
-### Month 2 — Capability checkpoint
+### Month 3 — Capability checkpoint
 
-- Identifies exact components and source files for any issue
-- Applies platform constraints and QLI 1.x vs 2.x differences automatically
-- Suggests targeted single-file code changes with file path, function, and diff
-- Generates platform-specific fixes — different code for QLI 1.x vs QLI 2.x
-
----
+- Identifies exact components and source files for any issue on either config
+- Suggests targeted single-file code changes with file path, function, diff
+- Applies platform constraints and QLI 1.x vs 2.x differences
+- Generates different fixes for Config 1 vs Config 2 for the same symptom
 
 ---
 
-# MONTH 3 — Complex Issues and Multi-File Fix Delivery
+---
+
+# MONTH 4 — Complex Issues and Multi-File Fix Delivery
 
 **Goal:** The skill handles issues where the root cause is unknown. It ranks
-hypotheses, generates a platform-specific diagnostic runbook, and — once the
-root cause is confirmed — produces multi-file code change suggestions covering
-all affected files with full context and rationale.
+hypotheses per config, generates platform-specific diagnostic runbooks, and
+produces complete multi-file code changes once the root cause is confirmed.
 
 ---
 
-## M5 · Weeks 9–10 · Root Cause Analysis, Diagnostics, and Hypothesis-Driven Code Suggestions
+## M6 · Weeks 12–13 · Root Cause Analysis, Diagnostics, and Hypothesis-Driven Code Suggestions
 
 ### What gets built
 
 For issues where the root cause is unknown (Type 10) or multi-causal
-(Types 5, 4, 6), the skill generates ranked hypotheses and a diagnostic
-runbook. Each hypothesis comes with the code change that would fix it —
-so once the engineer confirms the root cause, the fix is already there.
+(Types 5, 4, 6), the skill generates ranked hypotheses. Each hypothesis
+includes the diagnostic command to confirm it and the code change to fix it.
 
-**Root-cause hypothesis generation:**
-
-For each issue type + platform, the skill produces:
-- How the relevant part of the stack works (factual)
-- AudioReach graph construction chain where relevant
-- 2–4 ranked hypotheses, each labelled *(hypothesis)*
-- Per-hypothesis: the diagnostic command to confirm it, and the code change to fix it
-
-*Example — audio glitch on IQ9075 (QLI 2.x):*
+*Example — audio glitch on IQ9075, Config 2 (QLI 2.x):*
 ```
 5. Architecture Notes
 
-  Stack path:
+  Stack path (Config 2):
     PipeWire node → pipewire-pal-plugin → PAL::StreamPCM::open()
     → ResourceManager::getAudioRoute() → AGM::sessionOpen()
     → ADSP graph (SPF) → Codec / I2S
@@ -441,7 +530,7 @@ For each issue type + platform, the skill produces:
        /* PAL/src/Pal.cpp — pal_stream_start() */
        pal_stream_set_mute(stream_handle, true);
        status = rm->getAudioRoute(stream_handle);
-       usleep(IQ9075_CODEC_RAMP_US);   /* ~10ms ramp */
+       usleep(IQ9075_CODEC_RAMP_US);
        pal_stream_set_mute(stream_handle, false);
 
   2. [MED] SPA/ALSA underrun during first buffer cycle
@@ -456,57 +545,48 @@ For each issue type + platform, the skill produces:
      Confirm: journalctl -u wireplumber | grep 'activat'
      Fix:
        -- /etc/wireplumber/main.lua.d/52-pal-ready.lua
-       -- Delay node activation until PAL signals ready
        alsa_monitor.properties["alsa.reserve-device"] = true
 ```
 
-**Diagnostic runbook — platform-specific, copy-paste ready:**
+*Diagnostic runbook — platform-specific, copy-paste ready:*
 ```
   Step 1: $ PIPEWIRE_DEBUG=3 pw-play test.wav 2>&1 | grep -i 'underrun|xrun'
-          Look for: xrun count > 0  →  points to hypothesis 2
+          Look for: xrun count > 0  →  hypothesis 2
 
   Step 2: $ pw-top
           Look for: xrun counter in first 500ms  →  confirms hypothesis 2
 
   Step 3: $ journalctl -u wireplumber --since "1 min ago" | grep 'activat'
-          Look for: activation before PAL open  →  points to hypothesis 3
+          Look for: activation before PAL open  →  hypothesis 3
 
-  Step 4: $ logcat -s PAL:V AGM:V | grep 'setVolume\|mute'  [QLI 2.x only]
+  Step 4: $ logcat -s PAL:V AGM:V | grep 'setVolume\|mute'  [Config 2 only]
           Look for: volume set before mute ramp  →  confirms hypothesis 1
 ```
 
 **Deliverables:**
-- Section 5: ranked hypotheses, each with confirm command + fix code snippet
-- Section 7: diagnostic runbook (platform-specific commands, ordered by probability)
+- Section 5: ranked hypotheses with confirm command + fix code per hypothesis
+- Section 7: diagnostic runbook (Config-specific and platform-specific)
 - `references/platform_matrix.md` — known issue patterns expanded with
-  per-platform root causes, diagnostic steps, and fix references
+  per-config, per-platform root causes and fix references
 
 **Done when:** Hypothesis #1 is correct in 6/10 real cases; each hypothesis
-includes a code fix that resolves the issue when the hypothesis is confirmed.
+includes a code fix that resolves the issue when confirmed.
 
 ---
 
-## M6 · Weeks 11–12 · Full Multi-File Fix Delivery
+## M7 · Weeks 14–15 · Full Multi-File Fix Delivery
 
 ### What gets built
 
-Once the root cause is known (either from M5 diagnostics or from the user
-confirming a hypothesis), the skill produces a complete, reviewable set of
-code changes across all affected files — not just the primary fix but also
-the guard conditions, test additions, and documentation updates.
+Once the root cause is confirmed, the skill produces a complete, reviewable
+set of code changes across all affected files — primary fix, guard conditions,
+test additions, and documentation updates.
 
-**Code suggestion depth at M6 — complete multi-file changes:**
-
-*Example — audio glitch fix confirmed as hypothesis 1 (PAL mute ramp):*
-
+*Example — Config 2 audio glitch, hypothesis 1 confirmed (PAL mute ramp):*
 ```
 6. Code Changes
 
-  File 1: PAL/src/Pal.cpp
-  ─────────────────────────────────────────────────────────────────
-  Function: pal_stream_start()
-  Change: Add mute ramp around codec enable
-
+  File 1: PAL/src/Pal.cpp — pal_stream_start()
   - status = rm->getAudioRoute(stream_handle);
   + pal_stream_set_mute(stream_handle, true);
   + status = rm->getAudioRoute(stream_handle);
@@ -516,18 +596,11 @@ the guard conditions, test additions, and documentation updates.
   + }
 
   File 2: PAL/inc/PalDefs.h
-  ─────────────────────────────────────────────────────────────────
-  Change: Add platform-specific ramp constant
+  + #define IQ9075_CODEC_RAMP_US   10000
+  + #define QCS6490_CODEC_RAMP_US  8000
 
-  + #define IQ9075_CODEC_RAMP_US   10000   /* 10ms — from codec datasheet */
-  + #define QCS6490_CODEC_RAMP_US  8000    /* 8ms */
-
-  File 3: PAL/src/ResourceManager.cpp
-  ─────────────────────────────────────────────────────────────────
-  Function: platform_get_codec_ramp_us()
-  Change: New helper — returns platform-specific ramp delay
-
-  + uint32_t ResourceManager::platform_get_codec_ramp_us(pal_stream_handle_t *sh) {
+  File 3: PAL/src/ResourceManager.cpp — platform_get_codec_ramp_us()
+  + uint32_t ResourceManager::platform_get_codec_ramp_us(...) {
   +     switch (rm->getPlatformId()) {
   +         case PLATFORM_IQ9075:  return IQ9075_CODEC_RAMP_US;
   +         case PLATFORM_QCS6490: return QCS6490_CODEC_RAMP_US;
@@ -536,11 +609,7 @@ the guard conditions, test additions, and documentation updates.
   + }
 
   File 4: test/pal_stream_test.cpp
-  ─────────────────────────────────────────────────────────────────
-  Change: Add regression test for mute ramp on stream start
-
   + TEST(PalStreamTest, NoPopOnStreamStart) {
-  +     auto stream = pal_stream_open(PAL_STREAM_PCM_OFFLOAD, ...);
   +     EXPECT_CALL(mock_codec, setMute(true)).Times(1);
   +     EXPECT_CALL(mock_codec, setMute(false)).Times(1);
   +     pal_stream_start(stream);
@@ -548,22 +617,21 @@ the guard conditions, test additions, and documentation updates.
 ```
 
 **Deliverables:**
-- Section 6 produces complete multi-file diff with: file path, function,
-  before/after diff, rationale for each change
-- Section 7 includes regression test additions alongside functional tests
-- `--confirmed-hypothesis N` flag: skip diagnostic section, go straight to
-  full fix for hypothesis N
-- `--fix-only` flag: output only the code changes, no proposal boilerplate
+- Section 6: complete multi-file diff — file path, function, before/after,
+  rationale for each change
+- Section 7: regression test additions alongside functional tests
+- `--confirmed-hypothesis N` flag: skip diagnostics, go straight to full fix
+- `--fix-only` flag: output code changes only
 
-**Done when:** Multi-file fix is complete and self-consistent; an engineer
-can apply it directly without additional research; includes test additions.
+**Done when:** Multi-file fix is complete and self-consistent; engineer can
+apply it directly; includes test additions.
 
 ---
 
-### Month 3 — Capability checkpoint
+### Month 4 — Capability checkpoint
 
 - Ranks root-cause hypotheses with confirm commands and per-hypothesis fix code
-- Generates platform-specific diagnostic runbook
+- Generates Config-specific and platform-specific diagnostic runbooks
 - Produces complete multi-file code changes once root cause is confirmed
 - Includes regression test additions alongside every fix
 
@@ -571,25 +639,23 @@ can apply it directly without additional research; includes test additions.
 
 ---
 
-# MONTH 4 — New Feature Design and Implementation Guidance
+# MONTH 5 — New Feature Design and Full Implementation Guidance
 
 **Goal:** The skill handles new feature requests. It accepts architecture
-input, produces a full design proposal, and generates implementation-ready
-code scaffolding — API stubs, data structure definitions, integration hooks,
-and a complete implementation plan with effort estimates and dependencies.
+input, produces a full design proposal with code scaffolding, and then
+delivers complete implementation guidance. QGenie packaging is completed
+this month.
 
 ---
 
-## M7 · Weeks 13–14 · New Feature Design and Code Scaffolding
+## M8 · Weeks 16–17 · New Feature Design and Code Scaffolding
 
 ### What gets built
 
-For new feature requests (Types 1, 2, 3, 8, 9), the skill accepts architecture
-input and produces a design proposal with code scaffolding — the skeleton of
-the implementation that an engineer fills in, not a complete implementation.
-
-Without architecture input, the skill asks structured questions rather than
-guessing.
+For new feature requests (Types 1, 2, 3, 8, 9), the skill accepts
+architecture input and produces a design proposal with code scaffolding —
+the skeleton an engineer fills in. Without architecture input, the skill
+asks structured questions rather than guessing.
 
 **Architecture input modes:**
 
@@ -600,20 +666,14 @@ guessing.
 | `--data-flow TEXT` | Description of the data flow to be changed |
 | Conversational | Skill asks structured questions about the architecture |
 
-**Code suggestion depth at M7 — scaffolding and API stubs:**
-
-*Example — new feature: always-on audio on IQ9075:*
+*Example — always-on audio on IQ9075 (Config 2), scaffolding:*
 ```
-6. Code Scaffolding
-
   File 1: PAL/inc/PalDefs.h
-  ─────────────────────────────────────────────────────────────────
   + typedef enum {
-  +     PAL_STREAM_ALWAYS_ON_CAPTURE = 0x100,  /* new stream type */
+  +     PAL_STREAM_ALWAYS_ON_CAPTURE = 0x100,
   + } pal_stream_type_ext_t;
 
   File 2: PAL/src/StreamAlwaysOn.cpp  [new file]
-  ─────────────────────────────────────────────────────────────────
   + class StreamAlwaysOn : public Stream {
   + public:
   +     int32_t open(struct pal_stream_attributes *attr) override;
@@ -625,19 +685,14 @@ guessing.
   +     bool adsp_island_active_ = false;
   + };
 
-  File 3: src/modules/module-pal-source.c  (pipewire-pal-plugin)
-  ─────────────────────────────────────────────────────────────────
-  + /* TODO: add always-on source node type */
+  File 3: src/modules/module-pal-source.c
   + static const struct spa_dict_item always_on_props[] = {
-  +     { PW_KEY_NODE_NAME,        "pal.always_on.source" },
-  +     { PW_KEY_MEDIA_CLASS,      "Audio/Source/AlwaysOn" },
-  +     { "pal.stream.type",       "always_on_capture" },
-  + };
+  +     { PW_KEY_NODE_NAME,   "pal.always_on.source" },
+  +     { PW_KEY_MEDIA_CLASS, "Audio/Source/AlwaysOn" },
+  + };  /* TODO: register node */
 
   File 4: /etc/wireplumber/main.lua.d/53-always-on.lua
-  ─────────────────────────────────────────────────────────────────
-  + -- TODO: policy to keep always-on source active and suspend HLOS nodes
-  + alsa_monitor.rules = alsa_monitor.rules or {}
+  + -- TODO: policy to keep always-on source active
   + table.insert(alsa_monitor.rules, {
   +     matches = { { { "node.name", "matches", "pal.always_on.*" } } },
   +     apply_properties = { ["node.autoconnect"] = false },
@@ -645,88 +700,92 @@ guessing.
 ```
 
 **Deliverables:**
-- Section 5: architecture notes — how the existing stack works, where the
-  new feature fits, interface points, constraints
-- Section 6: code scaffolding — new files, new types, API stubs, integration
-  hooks, all marked `TODO` where implementation is needed
-- Section 9: risks — API compatibility, performance impact, platform
-  availability, firmware dependency
+- Section 5: architecture notes — existing stack, where feature fits,
+  interface points, constraints
+- Section 6: code scaffolding — new files, types, API stubs, integration
+  hooks, all `TODO`-marked where implementation is needed
 - `--arch-file`, `--component-desc`, `--data-flow` flags
 
-**Done when:** Scaffolding compiles (or is syntactically valid); an engineer
-can fill in the TODOs without needing to understand the full codebase from scratch.
+**Done when:** Scaffolding is syntactically valid; engineer can fill in
+TODOs without needing to understand the full codebase from scratch.
 
 ---
 
-## M8 · Weeks 15–16 · Full New Feature Implementation Guidance
+## M9 · Weeks 18–19 · Full New Feature Implementation Guidance
 
 ### What gets built
 
-The skill produces end-to-end implementation guidance for a new feature —
-complete code changes (not just scaffolding), a step-by-step integration
-plan with effort estimates and dependencies, a full test plan with exact
-commands, and documentation tasks.
+Complete implementation code (not just scaffolding), step-by-step integration
+plan with effort estimates and dependencies, full test plan, and documentation
+tasks.
 
-**Code suggestion depth at M8 — complete implementation:**
-
-*Example — always-on audio, full implementation:*
+*Example — always-on audio, full implementation plan:*
 ```
-6. Implementation
-
-  Step  File                          Change                              Effort  Depends on
-  ──────────────────────────────────────────────────────────────────────────────────────────
-  1     PAL/inc/PalDefs.h             Add PAL_STREAM_ALWAYS_ON_CAPTURE    S       —
-  2     PAL/src/StreamAlwaysOn.cpp    Implement StreamAlwaysOn class       L       1
-  3     PAL/src/ResourceManager.cpp   Add always-on usecase routing        M       2
-  4     resourcemanager.xml           Add always-on usecase definition     S       2
-  5     module-pal-source.c           Add always-on source node type       M       3
-  6     53-always-on.lua              Add WirePlumber suspend policy       M       5
-  7     test/always_on_test.cpp       Unit + integration tests             M       2,5
-  8     docs/always-on-audio.md       New documentation section            S       7
+  Step  File                       Change                              Effort  Depends on
+  ──────────────────────────────────────────────────────────────────────────────────────
+  1     PAL/inc/PalDefs.h          Add PAL_STREAM_ALWAYS_ON_CAPTURE    S       —
+  2     PAL/src/StreamAlwaysOn.cpp Implement StreamAlwaysOn class       L       1
+  3     PAL/src/ResourceManager.cpp Add always-on usecase routing       M       2
+  4     resourcemanager.xml        Add always-on usecase definition     S       2
+  5     module-pal-source.c        Add always-on source node type       M       3
+  6     53-always-on.lua           Add WirePlumber suspend policy       M       5
+  7     test/always_on_test.cpp    Unit + integration tests             M       2,5
+  8     docs/always-on-audio.md    New documentation section            S       7
 
   Full code for Step 2 (StreamAlwaysOn::start):
-  ─────────────────────────────────────────────
   int32_t StreamAlwaysOn::start() {
-      /* 1. Request ADSP island mode via AGM */
       status = agm_session_set_config(session_id_,
                    AGM_SESSION_CONFIG_ISLAND_MODE, true);
       if (status != AGM_EOK) return PAL_ERR_ADSP_ISLAND;
-
-      /* 2. Open capture graph on ADSP */
       status = agm_session_start(session_id_);
       if (status != AGM_EOK) return PAL_ERR_GRAPH_START;
-
       adsp_island_active_ = true;
-      PAL_DBG(LOG_TAG, "Always-on capture started, ADSP island active");
       return PAL_EOK;
   }
 ```
 
-**QGenie skill packaging (completed in M8):**
-- `SKILL.md` updated with all capabilities and trigger phrases
-- `agents/openai.yaml` updated
-- Conversational mode handles all 8 milestone capabilities
-- Installable: `Install the pipewire-enhancement skill from sauravk-git/saurav-skills`
-- README updated with all usage examples and worked examples
-- `references/examples.md` — 4 full worked examples:
-  1. Audio glitch (IQ9075, QLI 2.x) — complex issue, multi-file fix
-  2. SSMD not working (IQ9075) — medium issue, platform-conditional fix
-  3. Startup enumeration race — basic issue, config + code fix
-  4. Always-on audio (IQ9075) — new feature, full implementation
+**Deliverables:**
+- Section 6: complete implementation code with integration plan
+- Section 7: unit tests, integration tests, regression tests, stress tests
+- Section 8: documentation tasks — new API docs, integration guide, changelog
 
-**Done when:** Implementation guidance is complete and self-consistent;
-a senior engineer reviews it and accepts it as a valid starting point
-for a sprint without major rework; all 13 enhancement types handled
-with real, specific content including code suggestions.
+**Done when:** Implementation guidance accepted by a senior engineer as a
+valid sprint starting point without major rework.
 
 ---
 
-### Month 4 — Capability checkpoint
+## M10 · Week 20 · QGenie Packaging and Skill Hardening
+
+### What gets built
+
+Package everything as a production QGenie skill and harden the knowledge base.
+
+**Deliverables:**
+- `SKILL.md` updated with all capabilities and trigger phrases
+- `agents/openai.yaml` updated
+- Conversational mode handles all 10 milestone capabilities
+- Installable: `Install the pipewire-enhancement skill from sauravk-git/saurav-skills`
+- README updated with all usage examples
+- `references/examples.md` — 5 full worked examples:
+  1. Config 1 bringup — UCM2 mismatch diagnosis and fix
+  2. Config 2 bringup — PAL nodes not appearing
+  3. Audio glitch (IQ9075, Config 2) — complex issue, multi-file fix
+  4. SSMD not working (IQ9075) — medium issue, platform-conditional fix
+  5. Always-on audio (IQ9075) — new feature, full implementation
+- Knowledge base review: platform matrix, component map, examples validated
+  against real hardware
+
+**Done when:** Any engineer can install and use the skill from a single
+QGenie prompt; all 13 enhancement types handled end-to-end.
+
+---
+
+### Month 5 — Capability checkpoint
 
 - Accepts architecture input and produces design proposals for new features
-- Generates code scaffolding (API stubs, new files, integration hooks)
-- Produces complete implementation code for new features with effort estimates
+- Generates code scaffolding and complete implementation guidance
 - Handles all 13 enhancement types end-to-end with code change suggestions
+- Packaged as a production QGenie skill, installable in one command
 
 ---
 
@@ -734,16 +793,18 @@ with real, specific content including code suggestions.
 
 # Capability and Code Suggestion Growth
 
-| Milestone | Capability | Code suggestion depth |
-|---|---|---|
-| M1 (wk 2) | Guided bringup (Config 1 + Config 2); classify any issue | Bringup fix commands; config snippets |
-| M2 (wk 4) | Diagnose basic issues (both configs) | Config-specific snippets, known one-liners |
-| M3 (wk 6) | Component + source file awareness | Single-file targeted changes with file path and function |
-| M4 (wk 8) | Platform intelligence | Platform-conditional fixes — different code for QLI 1.x vs 2.x |
-| M5 (wk 10) | Root cause hypotheses + diagnostics | Per-hypothesis fix code alongside confirm command |
-| M6 (wk 12) | Full complex issue fix | Complete multi-file diff with test additions |
-| M7 (wk 14) | New feature design | Code scaffolding — new files, API stubs, TODOs |
-| M8 (wk 16) | New feature implementation | Complete implementation code with integration plan |
+| Milestone | Weeks | Capability | Code suggestion depth |
+|---|---|---|---|
+| M1 | 1–2 | Config 1 bringup; issue classifier | Bringup fix commands; config snippets |
+| M2 | 3–5 | Config 2 bringup | PAL/AGM/remoteproc fix commands |
+| M3 | 6–7 | Basic issue diagnosis — both configs | Config-specific snippets; known one-liners |
+| M4 | 8–9 | Component + source file awareness | Single-file targeted changes |
+| M5 | 10–11 | Platform intelligence | Platform-conditional fixes |
+| M6 | 12–13 | Root cause hypotheses + diagnostics | Per-hypothesis fix code + diagnostic runbook |
+| M7 | 14–15 | Full complex issue fix | Complete multi-file diff with test additions |
+| M8 | 16–17 | New feature design | Code scaffolding — API stubs, new files, TODOs |
+| M9 | 18–19 | New feature implementation | Complete implementation code with integration plan |
+| M10 | 20 | QGenie packaging + hardening | — |
 
 ---
 
@@ -764,9 +825,9 @@ with real, specific content including code suggestions.
 
 | Risk | Mitigation |
 |---|---|
+| Config 2 bringup more complex than estimated | 3 weeks allocated (M2); scope limited to known failure modes |
 | Keyword matching too shallow for complex issues | Build test suite at M1; iterate on keyword map each sprint |
 | Platform matrix goes stale as new platforms ship | Matrix in a separate `.md` file — updatable in 30 min |
-| Code suggestions are wrong or incomplete | Label all suggestions clearly as starting points; engineer reviews before applying |
+| Code suggestions are wrong or incomplete | Label all suggestions as starting points; engineer reviews before applying |
 | Root-cause hypotheses are incorrect | Label all hypotheses; validate with a senior engineer |
 | Architecture input quality varies | Skill asks structured clarifying questions when input is insufficient |
-| New feature scope creep beyond M8 | M8 produces implementation guidance — actual coding is the engineer's responsibility |
