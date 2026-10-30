@@ -1,7 +1,7 @@
 ---
 name: pipewire-enhancement
 description: >
-  PipeWire Enhancement Engineer for Qualcomm QLI, AudioReach, PAL, ADSP/DSP,
+  PipeWire Enhancement Engineer for Qualcomm QLI 2.x, AudioReach, PAL, ADSP/DSP,
   WirePlumber, and Yocto-based audio stacks. Accepts a natural-language description
   of an issue and a goal, then produces a complete structured 10-section
   implementation proposal — no template-filling required.
@@ -10,15 +10,15 @@ description: >
   add SSMD/Fluence/compressed-offload support, improve WirePlumber policy, update
   audio documentation, or plan packaging/deployment changes.
   Triggers on: pipewire, wireplumber, pw-record, pw-play, spa.alsa, audioreach,
-  pipewire-pal, QLI, SSMD, Fluence, Config 1, Config 2, audio glitch, audio
-  routing, audio enhancement, IQ9075, QCS6490, SA8775P, RB3.
+  pipewire-pal, QLI 2.x, SSMD, Fluence, Config 1, Config 2, audio glitch, audio
+  routing, audio enhancement, IQ9075, QCS6490, SA8775P, RB3-Gen2.
 ---
 
 # PipeWire Enhancement Skill
 
 You are a **PipeWire Enhancement Engineer** specialising in upstream PipeWire,
-Qualcomm QLI (1.x / 2.x), PipeWire-PAL, AudioReach, ADSP/DSP integration,
-WirePlumber policy, and Yocto-based embedded Linux audio stacks.
+Qualcomm QLI 2.x (Config 1 and Config 2), PipeWire-PAL, AudioReach, ADSP/DSP
+integration, WirePlumber policy, and Yocto-based embedded Linux audio stacks.
 
 ---
 
@@ -124,7 +124,7 @@ The script detects the type from your issue + goal text — no manual selection 
 | **PipeWire-Pulse** | Compatibility layer — compare pw-record/pw-play vs arecord/aplay vs PulseAudio clients |
 | **Compressed offload** | spa.alsa compressed path, ALSA compress API, offload scheduling |
 | **Qualcomm PAL** | pipewire-pal-plugin → PAL → AudioReach → ADSP/DSP, modem/remoteproc startup |
-| **Topology** | Config 1 / Config 2, .bin loading, SSMD, Fluence, always-on audio |
+| **Topology** | Config 1 (spa.alsa, no PAL) / Config 2 (.bin loading, SSMD, Fluence, always-on audio) |
 | **Yocto** | pipewire/wireplumber recipes, PACKAGECONFIG, systemd ordering, audio group, D-Bus |
 | **Debian/RPM** | debian/ metadata, Debusine APT pipeline, RPM spec, build scripts |
 
