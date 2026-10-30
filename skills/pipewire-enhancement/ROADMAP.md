@@ -17,14 +17,14 @@ PipeWire 1.x + WirePlumber 0.5.x on all platforms.
 | Month | Phase | Estimated hours |
 |---|---|---|
 | 1 | Knowledge Base | 16h |
-| 2 | Script Foundation + Basic Diagnosis (part 1) | 14h |
+| 2 | Script Foundation + Basic Diagnosis (part 1) | 16h |
 | 3 | Basic Diagnosis (part 2) + Config 1 Bringup | 16h |
 | 4 | PAL / AudioReach Knowledge Base + Config 2 Bringup | 16h |
-| 5 | Complex Issue Investigation (part 1) | 14h |
+| 5 | Complex Issue Investigation (part 1) | 16h |
 | 6 | Complex Issue Investigation (part 2) + New Feature Foundation | 16h |
 | 7 | New Features + Advanced Workflow Types | 16h |
 | 8 | Hardening, CLI Polish, and Full Validation | 13h |
-| | **Total** | **121h** (7h buffer) |
+| | **Total** | **127h** (1h buffer) |
 
 ---
 
@@ -50,7 +50,7 @@ built in later months depends on these being accurate and complete.
 
 ---
 
-## Month 2 — Script Foundation + Basic Diagnosis Part 1 (14h)
+## Month 2 — Script Foundation + Basic Diagnosis Part 1 (16h)
 
 **Goal:** Stand up `analyze_enhancement.py` with the core loop, CLI, and the
 first half of the 13 type detectors. Deliberately scoped to fit 14h — the
@@ -62,10 +62,14 @@ remaining detectors and testing move to Month 3.
 | Enhancement-type detectors — types 1–7 (new feature through config enhancement) | 4h | `scripts/analyze_enhancement.py` |
 | Gap-analysis logic — per-type missing-info checks, §4 output | 3h | `scripts/analyze_enhancement.py` |
 | Platform lookup — read `platform_matrix.md`, gate features by platform | 2h | `scripts/analyze_enhancement.py` |
+| §8 Documentation Tasks — generate list of pages/sections to create or update per proposal type | 1h | `scripts/analyze_enhancement.py` |
+| §10 Acceptance Criteria — measurable completion conditions generated per proposal type | 1h | `scripts/analyze_enhancement.py` |
 
 **Exit criteria:**
 - Script runs end-to-end for any type 1–7 request without crashing.
 - §4 gap analysis flags missing version and log info for each type.
+- §8 lists at least one concrete doc page/section to create or update per proposal.
+- §10 contains at least two measurable completion conditions per proposal.
 - No stdlib import beyond Python 3.8.
 
 ---
@@ -89,10 +93,12 @@ test cases, then add full Config 1 bringup coverage.
 | Task | Hours | Deliverable |
 |---|---|---|
 | Config 1 bringup steps — spa.alsa bring-up sequence, systemd ordering | 2h | `references/platform_matrix.md` §Config-1 |
-| Config 1 diagnostic commands | 1h | `references/platform_matrix.md` §3 |
+| Config 1 diagnostic commands | 0.5h | `references/platform_matrix.md` §3 |
 | Config 1 worked example | 2h | `references/examples.md` §3 |
 | Detect "Config 1" / "bringup" / "topology" in type 7; generate §6 bringup plan | 2h | `scripts/analyze_enhancement.py` |
-| Validate on IQ9075 and RB3-Gen2 | 1h | integration test |
+| §7 Test & Validation Plan — Config 1: exact pw-play / pw-record / aplay / wpctl commands per issue type | 1h | `scripts/analyze_enhancement.py` |
+| §9 Open Questions & Risks — Config 1: per-type risk identification with mitigations | 1h | `scripts/analyze_enhancement.py` |
+| Validate on IQ9075 and RB3-Gen2 | 0.5h | integration test |
 
 **Exit criteria:**
 - Complete 10-section proposal for all three baseline test cases.
@@ -135,7 +141,7 @@ sequenced within the month — docs first, script changes second.
 
 ---
 
-## Month 5 — Complex Issue Investigation Part 1 (14h)
+## Month 5 — Complex Issue Investigation Part 1 (16h)
 
 **Goal:** Build the root cause hypothesis engine and diagnostic runbooks.
 The heavier multi-file code change logic moves to Month 6 to keep this month
@@ -147,12 +153,16 @@ within budget.
 | Diagnostic runbooks — exact command sequences per symptom pattern, Config 1 and Config 2 paths | 4h | `references/platform_matrix.md` §runbooks |
 | Compound request handling — types 6 + 7 + 8 together without contradiction | 3h | `scripts/analyze_enhancement.py` |
 | Compound worked example (routing policy + Config 2 topology + PAL glitch) | 2h | `references/examples.md` §compound |
+| §7 Test & Validation Plan — Config 2: PAL logcat / remoteproc / AGM debug commands per issue type | 1h | `scripts/analyze_enhancement.py` |
+| §9 Open Questions & Risks — Config 2 + compound: PAL/ADSP risks with mitigations | 1h | `scripts/analyze_enhancement.py` |
 
 **Exit criteria:**
 - §5 of every complex issue proposal has at least two ranked hypotheses,
   each with source file pointer and evidence needed to confirm.
 - Diagnostic runbooks cover all known issue patterns in `platform_matrix.md`
   for both Config 1 and Config 2.
+- §7 includes exact PAL logcat + remoteproc commands for every Config 2 issue type.
+- §9 lists at least one PAL/ADSP-specific risk with mitigation per Config 2 proposal.
 - Compound requests produce a coherent, non-contradictory proposal.
 
 ---
